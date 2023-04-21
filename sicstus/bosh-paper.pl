@@ -3,12 +3,63 @@
 :- use_module(library(between)).
 %:- use_module('../data/products.pl').
 
-% 
-rotate([L,W,H], [RL,RW,RH]) :-    
-    element(IL, [L,W,H], RL),
-    element(IW, [L,W,H], RW),
-    element(IH, [L,W,H], RH),
-    all_distinct([IL,IW,IH]).
+/*
+For each product in turn:
+   product family, quantity to be shelved, length, width, height
+
+All orientations of each product are allowed and no product is allowed 
+to overhang a shelf.
+
+The two test problems have different bay files. 
+These files are baytp1 and baytp2 and the format of these files is:
+
+For each bay in turn:
+   width, height, depth, available height
+    1200   2400    650     3000
+Bays must be shelved used in same sequence as given in each file.
+
+Each bay can have a number of possible shelves.
+These are given in the file shelves
+The format of this file is:
+
+For each shelf in turn:
+    shelf number, thickness, position, top gap, left gap, inter gap, right gap
+	37 				40 			1800 	15 			10 		10 			10 
+*/
+
+% domain
+%product(F, Q, L, H, W)
+
+% shelve(length, height, width, thickness, top gap, left gap, inter gap, right gap)
+shelve(1200, 3000, 650, 40, 15, 10, 10, 10).
+    
+
+
+% rotate(+ProductDimensions, -RotateProdutcDimensions)
+rotate([L, H, W], [RL, RH, RW]) :- 
+	Vs = [IL, IW, IH],
+	domain(Vs, 1, 3),
+    all_distinct(Vs),
+    element(IL, [L,H,W], RL),
+    element(IH, [L,H,W], RH),
+    element(IW, [L,H,W], RW).
+
+% group_product(+Product, +HMax, -GroupedProduct)
+group_product(product(_F, Q, L, H, W), MaxH, TopGap, grouped(GL, GW, GH, RL, RW, RH)) :-
+    shelve(SL, _SH, SW, _THICK, _TG, _LG, IG, _RG),
+    rotate([L, H, W], [RL, RH, RW]), !,
+	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
+
+    NL * RL + IG #=< SL,
+   	NH * RH + TopGap #=< MaxH,
+	NW * RW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
+
+    NL * NH * NW #>= Q,
+	NL * NH * NW #=< Q * 2, 
+    GL #= NL * RL + IG,
+    GH #= NH * RH,
+    GW #= NW * RW.
+
 
 %-------------------------------------------------------------------------
 %  Unit tests
@@ -29,7 +80,19 @@ rotate([L,W,H], [RL,RW,RH]) :-
 		rotate([100,100,300], [300,100,100]).
 
 	test(rotate_vars, nondet) :-
-		rotate([1,2,3], [RL,RW,RH]),
-        permutation([1,2,3], [RL,RW,RH]).
+		rotate([1,2,3], [RL,RH,RW]),
+        permutation([1,2,3], [RL,RH,RW]).
+
+    % product(F, Q, L, H, W)
+    % group_product(product(F, Q, L, H, W))
+
+	test(group1) :- group_product(product(1, 5, 100, 620, 700), 
+            1000, 55, grouped(710, 500, 620, 700, 100, 620)).
+
+	test(group2) :- MaxH in 0..1000, group_product(product(1, 7, 100, 620, 700), 
+            MaxH, 55,  grouped(BL, BW, BH, RL, RW, RH)).  
+
+	test('group - droped prod', fail) :- MaxH in 0..100, group_product(product(1, 7, 100, 620, 700), 
+            MaxH, 55,  grouped(BL, BW, BH, RL, RW, RH)).  
 
 :- end_tests(bosh).
