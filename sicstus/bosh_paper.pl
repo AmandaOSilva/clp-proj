@@ -87,7 +87,11 @@ chosen_constraints([_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V|Vs], [C|Cs], Sum
 	chosen_constraints(GPsTail, Vs, Cs, Sum1),
 	Sum #= Sum1 + C * GL * GW * GH. 
 	
-
+split_chosen([], [], [], []).
+split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs]) :-
+	split_chosen(GPsTail, Cs, CPs, RPs).
+split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs) :-
+	split_chosen(GPsTail, Cs, CPs, RPs).
 
 append_vars([], [], []).
 append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V, GL, GW, GH|AllVs]) :-
@@ -101,20 +105,20 @@ bosh-knapsack(Coeffs, Xs, Total) :-
         do  S2 #= S1 + C * X),
         Total #= Sum.
 
-bosh(Fs, res(NBays, GPs, DPs)) :- 
+bosh(Fs, res(NBays, CPs, DPs)) :- 
     max_available_height(AvalH),
-    bosh(Fs, AvalH, 1, NBays, GPs, DPs).
+    bosh(Fs, AvalH, 1, NBays, CPs, DPs).
 
 bosh([], _, _, [], [], []).
-bosh([[]|Fs], AvalH, Acc, [Acc|NBays], GPs, DPs) :- 
-    bosh(Fs, AvalH, 0, NBays, GPs, DPs).
+bosh([[]|Fs], AvalH, Acc, [Acc|NBays], CPs, DPs) :- 
+    bosh(Fs, AvalH, 0, NBays, CPs, DPs).
 
-bosh([F|Fs], AvalH, N, NBays, [MaxH-GPs|GPsTail], DPs) :- 
+bosh([F|Fs], AvalH, N, NBays, [MaxH-CPs|GPsTail], DPs) :- 
     bay(MaxSL, _, _, _),
     shelve(THICK, TG, LG, _IG, _RG),
     (AvalH = 3000 -> 
-	  TopGap = TG % no shelve yet
-	; TopGap = THICK + TG), % top gap 40+15
+	  TopGap is TG % no shelve yet
+	; TopGap is THICK + TG), % top gap 40+15
 
     maxH_domain(AvalH, MaxH),
     group_products(F, MaxH, TopGap, Ls, GPs, DPs),
@@ -136,7 +140,23 @@ bosh([F|Fs], AvalH, N, NBays, [MaxH-GPs|GPsTail], DPs) :-
 
     %Waste #= MaxH + (MaxSL - LG - MaxL),
 	%labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
-    print([MaxH,MaxL, Cs]) .
+
+	split_chosen(GPs, Cs, CPs, RPs),
+	%append(CPs, CPVars),
+	%labeling([], [YMax|CPVars]),
+
+	length(CPs, L1),
+	length(RPs, L2),
+	print([L1, CPs, L2]), nl, 
+    
+    ( L1 > 0, !; false ),
+	%check_chosen(CPs, MaxH),
+	AvalH1 is AvalH - MaxH,
+	append(DPs, RPs, F1),
+	( AvalH1 > 0, bosh([F1|Fs], AvalH1, N, NBays, GPsTail, DPs), !;
+	( N1 is N + 1,
+	  (bosh([F1|Fs], MaxSL, N1, NBays, GPsTail, DPs); nl, nl,write(['\'Dropped products\'', DPs]), nl, nl, NBays is [N])
+	)).
 
 
 go :- families_sorted(Fs), bosh(Fs, Res).
