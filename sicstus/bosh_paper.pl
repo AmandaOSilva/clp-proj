@@ -30,9 +30,14 @@ For each shelf in turn:
 % domain
 %product(F, Q, L, H, W)
 
-% shelve(length, height, width, thickness, top gap, left gap, inter gap, right gap)
-shelve(1200, 3000, 650, 40, 15, 10, 10, 10).
-    
+% bay(width, height, depth, available height)
+bay(1200, 2400, 650, 3000).
+max_available_height(H) :- bay(_,_,_, H).
+
+% shelve(thickness, top gap, left gap, inter gap, right gap)
+shelve(40, 15, 10, 10, 10).
+
+
 % rotate(+ProductDimensions, -RotateProdutcDimensions)
 rotate([L, H, W], [RL, RH, RW]) :- 
 	Vs = [IL, IW, IH],
@@ -42,11 +47,12 @@ rotate([L, H, W], [RL, RH, RW]) :-
     element(IH, [L,H,W], RH),
     element(IW, [L,H,W], RW).
 
-% group_product(+Product, +HMax, -GroupedProduct)
-group_products([], _, _, [], []) :- !.
-group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, 
+% group_product(+Product, +MaxH, -GroupedProduct)
+group_products([], _, _, [], [], []) :- !.
+group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL|Ls],
     [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
-    shelve(SL, _SH, SW, _THICK, _TG, _LG, IG, _RG),
+    bay(SL, _, SW, _),
+    shelve(_THICK, _TG, _LG, IG, _RG),
     rotate([L, H, W], [RL, RH, RW]), 
 	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
 
@@ -59,10 +65,84 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap,
     GL #= NL * RL + IG,
     GH #= NH * RH,
     GW #= NW * RW, 
-    group_products(Ps, MaxH, TopGap, GPsTail, DPs), !.
+    group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs), !.
 
-group_products([P|Ps], MaxH, TopGap, GPs, [P|DPsTail]) :-
-    group_products(Ps, MaxH, TopGap, GPs, DPsTail).
+group_products([P|Ps], MaxH, TopGap, Ls, GPs, [P|DPsTail]) :- 
+    group_products(Ps, MaxH, TopGap, Ls, GPs, DPsTail), !.
+
+maxH_domain(AvalH, MaxH) :-
+    bay(_, BH, _, BAH),
+	X is BAH - AvalH,
+    Diff = BAH-BH,
+	( X < (Diff) ->
+	  MinHDomain is Diff - X
+	; MinHDomain is 50), % 50 = space between shelves
+	numlist(MinHDomain, 50, AvalH, _, MaxHDomain),
+	list_to_fdset(MaxHDomain, FDS_MaxHDomain),	
+	MaxH in_set FDS_MaxHDomain.
+
+chosen_constraints([], [], [], 0).
+chosen_constraints([_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V|Vs], [C|Cs], Sum) :-
+	V #= 1 #<=> C,
+	chosen_constraints(GPsTail, Vs, Cs, Sum1),
+	Sum #= Sum1 + C * GL * GW * GH. 
+	
+
+
+append_vars([], [], []).
+append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V, GL, GW, GH|AllVs]) :-
+	append_vars(Vs, GPsTail, AllVs).
+
+% TODO: add link to source
+bosh-knapsack(Coeffs, Xs, Total) :-
+        ( foreach(C, Coeffs),
+          foreach(X, Xs),
+            fromto(0, S1, S2, Sum)
+        do  S2 #= S1 + C * X),
+        Total #= Sum.
+
+bosh(Fs, res(NBays, GPs, DPs)) :- 
+    max_available_height(AvalH),
+    bosh(Fs, AvalH, 1, NBays, GPs, DPs).
+
+bosh([], _, _, [], [], []).
+bosh([[]|Fs], AvalH, Acc, [Acc|NBays], GPs, DPs) :- 
+    bosh(Fs, AvalH, 0, NBays, GPs, DPs).
+
+bosh([F|Fs], AvalH, N, NBays, [MaxH-GPs|GPsTail], DPs) :- 
+    bay(MaxSL, _, _, _),
+    shelve(THICK, TG, LG, _IG, _RG),
+    (AvalH = 3000 -> 
+	  TopGap = TG % no shelve yet
+	; TopGap = THICK + TG), % top gap 40+15
+
+    maxH_domain(AvalH, MaxH),
+    group_products(F, MaxH, TopGap, Ls, GPs, DPs),
+    same_length(F, Vs),
+    domain(Vs, 1, 2),
+
+    chosen_constraints(GPs, Vs, Cs, FilledSum),
+
+	MaxL #=< MaxSL - LG,
+	bosh-knapsack(Cs, Ls, MaxL),
+
+    append_vars(Vs, GPs, Vs1),
+	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
+    
+    MedUtil #> 0,
+	MedUtil * MaxH * MaxL #=< FilledSum,	
+	(MedUtil+1) * MaxH * MaxL #> FilledSum,
+	labeling([maximize(MedUtil), time_out(3000, _Flag)], Vars),
+
+    %Waste #= MaxH + (MaxSL - LG - MaxL),
+	%labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
+    print([MaxH,MaxL, Cs]) .
+
+
+go :- families_sorted(Fs), bosh(Fs, Res).
+
+
+
 
 
 %-------------------------------------------------------------------------
