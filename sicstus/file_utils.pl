@@ -1,5 +1,10 @@
 :- use_module(library(lists)).
 
+:- prolog_load_context('directory', Dir), assert(current_dir(Dir)), print(Dir).
+
+to_absolute_filename(Rel, Abs) :-
+     current_dir(Dir), absolute_file_name(Rel, Abs, [relative_to(Dir)]).
+
 read_number(X) :- 	read_number(X, true, 0).
 read_number(X, Skipline) :- read_number(X, Skipline, 0).
 
@@ -16,11 +21,12 @@ read_file_lines(Matrix) :- read_file_lines(Matrix, []).
 read_file_lines(Matrix, Acc) :- peek_code(10), skip_line, !, reverse(Acc, Matrix).
 read_file_lines(Matrix, Acc) :- read_file_line(Line), read_file_lines(Matrix,[Line|Acc]).
 
-read_file(File, Matrix) :- 
-	see(File), 
+read_file(FileName, Matrix) :- 
+	to_absolute_filename(FileName, AbsFileName),
+	see(AbsFileName), 
 	%read_number(N),
 	read_file_lines(Matrix),
-	close(File).
+	close(AbsFileName).
 	
 
 write_file_line([]) :- !.	
@@ -36,15 +42,17 @@ write_file_lines([H|Ts]) :-
 	write_file_lines(Ts).	
 	
 
-write_file(File, Matrix) :- 
-	tell(File),
+write_file(FileName, Matrix) :- 
+	to_absolute_filename(FileName, AbsFileName),
+	tell(AbsFileName),
 	length(Matrix, L),
 	write(L), nl,
 	write_file_lines(Matrix),
-	close(File).
+	close(AbsFileName).
 	
-write_matrix_in_file(File, Name, Matrix) :- 
-	tell(File),
+write_matrix_in_file(FileName, Name, Matrix) :- 
+	to_absolute_filename(FileName, AbsFileName),
+	tell(AbsFileName),
 	write(Name), write(' = '), write(Matrix), nl,
-	close(File).
+	close(AbsFileName).
 	

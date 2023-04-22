@@ -1,10 +1,10 @@
 :- use_module(library(system)).
-:- use_module(library(file_system)).
 :- use_module(library(samsort)).
-:- use_module('file_utils.pl').
+:- consult('file_utils.pl').
 
-read_products(Ps) :-
-    read_file('d:/feup/PLR/clp-proj/data/products.txt', Ps).
+
+read_products(Ps) :- 
+    read_file('../data/products.txt', Ps).
 
 same_family([F|_],[F|_]).
 

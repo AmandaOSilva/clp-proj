@@ -1,7 +1,7 @@
 :- use_module(library(clpfd)).
 :- use_module(library(lists)).
 :- use_module(library(between)).
-:- use_module('process_files.pl').
+:- consult('process_files.pl').
 
 /*
 For each product in turn:
