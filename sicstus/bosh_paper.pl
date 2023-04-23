@@ -149,15 +149,15 @@ bosh([F|Fs], AvalH, N, NBays, [AvalH1-CPs|CPsTail], DPs) :-
     append_vars(Vs, GPs, Vs1),
 	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
 
-/*    
+    
     MedUtil #> 0,
 	MedUtil * MaxH * MaxL  #=< FilledSum,	
 	(MedUtil+1) * MaxH * MaxL #> FilledSum,
 	labeling([maximize(MedUtil), time_out(3000, _Flag)], Vars),
-*/
-    %Waste #= MaxH + (MaxSL - LG - MaxL),
-	%labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
-	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
+
+%    Waste #= MaxH + (MaxSL - LG - MaxL),
+%	labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
+	%labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
 
 	split_chosen(GPs, Cs, CPs, RPs),
 	%append(CPs, CPVars),

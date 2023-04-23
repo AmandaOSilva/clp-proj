@@ -18,8 +18,12 @@ families(Fs) :-
     group(same_family, Ps, Fs).  
 
 families_sorted(FsSorted) :- 
-    families(Fs), 
-    maplist(samsort(by_volume), Fs, FsSorted).
+    families(Fs),
+    samsort(by_family_number, Fs, Fs1),
+    maplist(samsort(by_volume), Fs1, FsSorted).
+
+by_family_number([product(FN1, _, _, _, _)|_], [product(FN2, _, _, _, _)|_]) :-
+    FN1 < FN2.
 
 by_volume(product(_, Q1, L1, H1, W1), product(_F, Q2, L2, H2, W2)) :-
 	Q1 * L1 * H1 * W1 > Q2 * L2 * H2 * W2. % from largest to smallers products
