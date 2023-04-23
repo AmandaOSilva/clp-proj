@@ -27,6 +27,19 @@ For each shelf in turn:
 	37 				40 			1800 	15 			10 		10 			10 
 */
 
+reset_timer:-
+	statistics(total_runtime, _).
+get_time(TS) :- 
+	statistics(total_runtime,[_,T]),
+	TS is ((T//10)*10)/1000.
+
+print_time(Msg):-
+	get_time(TS), nl, 
+    write(Msg),
+	write(TS),
+	write('s'), nl.
+
+
 % domain
 %product(F, Q, L, H, W)
 
@@ -49,7 +62,7 @@ rotate([L, H, W], [RL, RH, RW]) :-
 
 % group_product(+Product, +MaxH, -GroupedProduct)
 group_products([], _, _, [], [], []) :- !.
-group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL|Ls],
+group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GH, GW|Ls],
     [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
     bay(SL, _, SW, _),
     shelve(_THICK, _TG, _LG, IG, _RG),
@@ -98,12 +111,14 @@ append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V, GL, GW, GH|All
 	append_vars(Vs, GPsTail, AllVs).
 
 % TODO: add link to source
-bosh-knapsack(Coeffs, Xs, Total) :-
+bosh-knapsack(Coeffs, GPs, Total) :-
         ( foreach(C, Coeffs),
-          foreach(X, Xs),
+          foreach(GP, GPs),
             fromto(0, S1, S2, Sum)
-        do  S2 #= S1 + C * X),
-        Total #= Sum.
+        do  
+            GP = _-grouped(GL, _, _, _, _, _),
+            S2 #= S1 + C * GL),
+            Total #= Sum.
 
 bosh(Fs, res(NBays, CPs, DPs)) :- 
     max_available_height(AvalH),
@@ -113,8 +128,9 @@ bosh([], _, _, [], [], []).
 bosh([[]|Fs], AvalH, Acc, [Acc|NBays], CPs, DPs) :- 
     bosh(Fs, AvalH, 0, NBays, CPs, DPs).
 
-bosh([F|Fs], AvalH, N, NBays, [MaxH-CPs|GPsTail], DPs) :- 
-    bay(MaxSL, _, _, _),
+bosh([F|Fs], AvalH, N, NBays, [AvalH1-CPs|CPsTail], DPs) :- 
+    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, N, Size]), nl,    
+    bay(MaxSL, _, _, MaxSH),
     shelve(THICK, TG, LG, _IG, _RG),
     (AvalH = 3000 -> 
 	  TopGap is TG % no shelve yet
@@ -128,39 +144,43 @@ bosh([F|Fs], AvalH, N, NBays, [MaxH-CPs|GPsTail], DPs) :-
     chosen_constraints(GPs, Vs, Cs, FilledSum),
 
 	MaxL #=< MaxSL - LG,
-	bosh-knapsack(Cs, Ls, MaxL),
+	bosh-knapsack(Cs, GPs, MaxL),
 
     append_vars(Vs, GPs, Vs1),
 	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
-    
+
+/*    
     MedUtil #> 0,
-	MedUtil * MaxH * MaxL #=< FilledSum,	
+	MedUtil * MaxH * MaxL  #=< FilledSum,	
 	(MedUtil+1) * MaxH * MaxL #> FilledSum,
 	labeling([maximize(MedUtil), time_out(3000, _Flag)], Vars),
-
+*/
     %Waste #= MaxH + (MaxSL - LG - MaxL),
 	%labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
+	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
 
 	split_chosen(GPs, Cs, CPs, RPs),
 	%append(CPs, CPVars),
-	%labeling([], [YMax|CPVars]),
+	labeling([], [MaxH|Ls]),
 
 	length(CPs, L1),
-	length(RPs, L2),
-	print([L1, CPs, L2]), nl, 
+	%length(RPs, L2),
+	%print([L1, CPs, L2]), nl, 
     
     ( L1 > 0, !; false ),
 	%check_chosen(CPs, MaxH),
 	AvalH1 is AvalH - MaxH,
 	append(DPs, RPs, F1),
-	( AvalH1 > 0, bosh([F1|Fs], AvalH1, N, NBays, GPsTail, DPs), !;
+	( AvalH1 > 0, bosh([F1|Fs], AvalH1, N, NBays, CPsTail, DPs), !;
 	( N1 is N + 1,
-	  (bosh([F1|Fs], MaxSL, N1, NBays, GPsTail, DPs); nl, nl,write(['\'Dropped products\'', DPs]), nl, nl, NBays is [N])
+	  ( bosh([F1|Fs], MaxSH, N1, NBays, CPsTail, DPs); nl, nl,write(['\'Dropped products\'', DPs]), nl, nl, NBays is [N])
 	)).
 
 
-go :- families_sorted(Fs), bosh(Fs, Res).
+go :- families_sorted(Fs), !, length(Hs,10), append(Hs, _, Fs),  bosh(Hs, Res),  Res = res(NBays, GPs, _), nl, length(GPs, L) , print([L, NBays]), fd_statistics.%, statistics.
+go(N) :- families_sorted(Fs), nth1(N, Fs, F), fd_statistics, reset_timer, bosh([F], Res), !, print_time(Res), Res = res(NBays, GPs, _), nl, length(GPs, L) , print([L, NBays]), fd_statistics.%, statistics.
 
+goU(N) :- families(Fs), nth1(N, Fs, F), fd_statistics, reset_timer, bosh([F], Res), !, print_time(Res), Res = res(NBays, GPs, _), nl, length(GPs, L) , print([L, NBays]), fd_statistics.%, statistics.
 
 
 
