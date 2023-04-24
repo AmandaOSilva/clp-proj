@@ -2,7 +2,12 @@
 
 
 
-goVis(N, Res) :-  fd_statistics, reset_timer, families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), bosh([F], Res), !, print_time(Res), Res = res(NBays, GPs, _), nl, length(GPs, L) , print([L, NBays]), fd_statistics.%, statistics.
+%print_time(Res), 
+goVis(N, Res) :-  
+    fd_statistics, reset_timer, 
+    families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
+    bosh([F], Res), !, Res = res(GPs, _), 
+    nl, length(GPs, L), print([L]), fd_statistics.%, statistics.
 
 
 shelved_product_position(OH, OL, grouped(GL, GW, GH, RL, RW, RH), (PL,PW, PH)) :-
@@ -13,8 +18,8 @@ shelved_product_position(OH, OL, grouped(GL, GW, GH, RL, RW, RH), (PL,PW, PH)) :
     PH #= OH + NH * RH,
     labeling([], [PL,PH,PW]).
 
-process_shelved_products(_, _, [], [], [], []).
-process_shelved_products(OH, OL, [product(_F, Q, _L, _H, _W)-grouped(GL, GW, GH, RL, RW, RH)|SPs], 
+process_product(_, _, [], [], [], []).
+process_product(OH, OL, [product(_F, Q, _L, _H, _W)-grouped(GL, GW, GH, RL, RW, RH)|SPs], 
             Ps, Sizes, Colors) :-
     findall(P, shelved_product_position(OH, OL, grouped(GL, GW, GH, RL, RW, RH), P), Pos1),    
     length(Pos, Q),
@@ -22,29 +27,48 @@ process_shelved_products(OH, OL, [product(_F, Q, _L, _H, _W)-grouped(GL, GW, GH,
     (foreach(_, Pos), foreach(Sz, Size), param([RL, RW, RH]) do Sz = (RL, RW, RH)),
     (foreach(_, Pos), foreach(C, Color) do C = '"green"'),
     OL1 is OL + GL,
-    process_shelved_products(OH, OL1, SPs, Ps1, Sizes1, Colors1),
+    process_product(OH, OL1, SPs, Ps1, Sizes1, Colors1),
     append(Pos, Ps1, Ps),
     append(Size, Sizes1, Sizes),
     append(Color, Colors1, Colors).
 
 
 process_shelve([], [], [], []).
-process_shelve([SH-CPs|GPs], [(0, 0, ShPosH)|Ps], [(1200, 650, 40)|Sizes], ['"yellow"'|Colors]) :-
-    ShPosH = SH - 40 ,
-    process_shelved_products(SH, 0, CPs, Pos, Size, Color),
+process_shelve([(_, _, SH)-CPs|GPs], [(0, 0, ShPosH)|Ps], [(1200, 650, 40)|Sizes], ['"yellow"'|Colors]) :-
+    ShPosH is SH - 40 ,
+    process_product(SH, 10, CPs, Pos, Size, Color),
     process_shelve(GPs, Ps1, Sizes1, Colors1),
     append(Pos, Ps1, Ps),
     append(Size, Sizes1, Sizes),
     append(Color, Colors1, Colors).
     
+same_bay((N1,_, _)-_, (N2,_, _)-_) :- N2 = N1.
+
+/*
+sameMatrixDimention([], _, _, [], []).
+sameMatrixDimention([P|PsG], Sizes, Colors, [SizesG|SizesGTail], [ColorsG|ColorsGTail]) :-
+    same_length(P, SizesG),
+    same_length(P, ColorsG),
+    append(SizesG, _, Sizes),
+    append(ColorsG, _, Colors),
+    sameMatrixDimention(PsG, Sizes, Colors, SizesGTail, ColorsGTail).
+*/
+
+process_bay([], [], [], []).
+process_bay([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) :-
+    process_shelve(BayCPs, Ps, Sizes, Colors),
+    process_bay(CPs, PsTail, SizesTail, ColorsTail).
 
 exporter(N) :-
-    goVis(N,res(_NBays, GPs, _DPs)), !,
-    process_shelve(GPs, Ps, Sizes, Colors),
+    goVis(N,res(CPs, _DPs)), !,
+    group(same_bay, CPs, CPsByBay),
+    process_bay(CPsByBay, Ps, Sizes, Colors),
+    %Res = [Ps, Sizes, Colors],
+    %write_matrix_in_file('../visualizer/bosh_result.py', 'RES', Res),
+    
+%    sameMatrixDimention(PsG, Sizes, Colors, SizesG, ColorsG),
     Res = [Ps, Sizes, Colors],
-    write_matrix_in_file('../visualizer/bosh_result.py', 'RES', Res).
-
-
+    write_matrix_in_file('../visualizer/output/bosh_result.py', 'RES', Res).
 
 
 %-------------------------------------------------------------------------
@@ -64,5 +88,5 @@ test(shelved-product-position0) :-
 test(shelved-product-position-all) :-
     findall(Pos, shelved-product-position(0, 0, grouped(40, 40, 30, 10, 20, 30), Pos), _AllPos). 
 
-:- end_tests(visu).    
-*/
+:- end_tests(visu). 
+*/   
