@@ -62,7 +62,7 @@ rotate([L, H, W], [RL, RH, RW]) :-
 
 % group_product(+Product, +MaxH, -GroupedProduct)
 group_products([], _, _, [], [], []) :- !.
-group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GH, GW|Ls],
+group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
     [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
     bay(SL, _, SW, _),
     shelve(_THICK, _TG, LG, IG, _RG),
@@ -107,7 +107,7 @@ split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs) :-
 	split_chosen(GPsTail, Cs, CPs, RPs).
 
 append_vars([], [], []).
-append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V, GL, GW, GH|AllVs]) :-
+append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [GL, GW, GH, V|AllVs]) :-
 	append_vars(Vs, GPsTail, AllVs).
 
 % TODO: add link to source
@@ -139,30 +139,32 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
 
     maxH_domain(AvalH, MaxH),
     group_products(F, MaxH, TopGap, Ls, GPs, DPs1),
-    same_length(F, Vs),
-    domain(Vs, 1, 2),
 
     chosen_constraints(GPs, Vs, Cs, FilledSum),
+    domain(Vs, 1, 2),
 
 	MaxL #=< MaxSL - LG,
 	bosh-knapsack(Cs, GPs, MaxL),
 
     append_vars(Vs, GPs, Vs1),
-	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
+	append(Vs1, [MaxH], Vars),
+%	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
 
  /*   
     MedUtil #> 0,
 	MedUtil * MaxH * MaxL  #=< FilledSum,	
 	(MedUtil+1) * MaxH * MaxL #> FilledSum,
 	labeling([maximize(MedUtil), time_out(3000, _Flag)], Vars),
+
+    Waste #= MaxH + (MaxSL - LG - MaxL),
+	labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
 */
-%    Waste #= MaxH + (MaxSL - LG - MaxL),
-%	labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
+
 	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
 
 	split_chosen(GPs, Cs, CPs, RPs),
 	%append(CPs, CPVars),
-	labeling([], [MaxH|Ls]),
+	labeling([], Ls),
 
 	length(CPs, L1),
 	%length(RPs, L2),
@@ -177,9 +179,18 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
 	  ( bosh([F1|Fs], MaxSH, N1, CPsTail, DPs2), DPs = DPs2; DPs = F1, nl, nl, write(['\'Family shelve not complete, dropped products: \'', DPs]), nl, nl)
 	)).
 
+go(NI, N, FsFull) :- 
+    NI > 0, NI1 is NI - 1,
+    length(Pre, NI1), append(Pre, Ts, FsFull),
+    %length(FsFull, L), LPos = L - NF, 
+    length(Fs, N), append(Fs,_, Ts),
+    !, fd_statistics, reset_timer, 
+    bosh(Fs, Res), print_time('Time: '), 
+    fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), fd_statistics.%, statistics.
 
-go :- families_sorted(Fs), !, fd_statistics, reset_timer, length(Hs,10), append(Hs, _, Fs),  bosh(Fs, Res), print_time('Time: '), fd_statistics, Res = res(NBays, NT, CPs, _), nl, length(CPs, L) , print([L, NT, NBays]), fd_statistics.%, statistics.
-go(N) :- families_sorted(Fs), nth1(N, Fs, F), fd_statistics, reset_timer, bosh([F], Res), !, print_time(Res), Res = res(NBays, NT, CPs, _), nl, length(CPs, L) , print([L, NT, NBays]), fd_statistics.%, statistics.
+go(NI, N) :- families_sorted(Fs), go(NI, N, Fs).
+go :-  families_sorted(Fs), length(Fs, L), go(1, L, Fs).
+go(N) :- families_sorted(Fs), go(N,1, Fs).
 
 goU(N) :- families(Fs), nth1(N, Fs, F), fd_statistics, reset_timer, bosh([F], Res), !, print_time(Res), Res = res(NBays, NT, CPs, _), nl, length(CPs, L) , print([L, NT, NBays]), fd_statistics.%, statistics.
 

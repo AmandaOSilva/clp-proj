@@ -23,9 +23,9 @@ process_product(OH, OL, [product(_F, Q, _L, _H, _W)-grouped(GL, GW, GH, RL, RW, 
             Ps, Sizes, Colors) :-
     findall(P, shelved_product_position(OH, OL, grouped(GL, GW, GH, RL, RW, RH), P), Pos1),    
     length(Pos, Q),
-    append(Pos,_, Pos1), % TODO: processo de empacotamento precisa ser revisto
+    append(Pos,_, Pos1), % TODO: rever processo de empacotamento ()
     (foreach(_, Pos), foreach(Sz, Size), param([RL, RW, RH]) do Sz = (RL, RW, RH)),
-    (foreach(_, Pos), foreach(C, Color) do C = '"green"'),
+    (foreach(_, Pos), foreach(C, Color) do C = '"g"'),
     OL1 is OL + GL,
     process_product(OH, OL1, SPs, Ps1, Sizes1, Colors1),
     append(Pos, Ps1, Ps),
@@ -34,7 +34,7 @@ process_product(OH, OL, [product(_F, Q, _L, _H, _W)-grouped(GL, GW, GH, RL, RW, 
 
 
 process_shelve([], [], [], []).
-process_shelve([(_, _, SH)-CPs|GPs], [(0, 0, ShPosH)|Ps], [(1200, 650, 40)|Sizes], ['"yellow"'|Colors]) :-
+process_shelve([(_, _, SH)-CPs|GPs], [(0, 0, ShPosH)|Ps], [(1200, 650, 40)|Sizes], ['"y"'|Colors]) :-
     ShPosH is SH - 40 ,
     process_product(SH, 10, CPs, Pos, Size, Color),
     process_shelve(GPs, Ps1, Sizes1, Colors1),
@@ -43,16 +43,6 @@ process_shelve([(_, _, SH)-CPs|GPs], [(0, 0, ShPosH)|Ps], [(1200, 650, 40)|Sizes
     append(Color, Colors1, Colors).
     
 same_bay((N1,_, _)-_, (N2,_, _)-_) :- N2 = N1.
-
-/*
-sameMatrixDimention([], _, _, [], []).
-sameMatrixDimention([P|PsG], Sizes, Colors, [SizesG|SizesGTail], [ColorsG|ColorsGTail]) :-
-    same_length(P, SizesG),
-    same_length(P, ColorsG),
-    append(SizesG, _, Sizes),
-    append(ColorsG, _, Colors),
-    sameMatrixDimention(PsG, Sizes, Colors, SizesGTail, ColorsGTail).
-*/
 
 process_bay([], [], [], []).
 process_bay([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) :-
@@ -63,10 +53,6 @@ exporter(N) :-
     goVis(N,res(CPs, _DPs)), !,
     group(same_bay, CPs, CPsByBay),
     process_bay(CPsByBay, Ps, Sizes, Colors),
-    %Res = [Ps, Sizes, Colors],
-    %write_matrix_in_file('../visualizer/bosh_result.py', 'RES', Res),
-    
-%    sameMatrixDimention(PsG, Sizes, Colors, SizesG, ColorsG),
     Res = [Ps, Sizes, Colors],
     write_matrix_in_file('../visualizer/output/bosh_result.py', 'RES', Res).
 
