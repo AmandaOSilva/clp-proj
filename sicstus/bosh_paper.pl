@@ -77,8 +77,8 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
 	NL * NH * NW #=< Q * 2, 
     GL #= NL * RL + IG,
     GH #= NH * RH,
-    GW #= NW * RW, 
-    group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs), !.
+    GW #= NW * RW, !,
+    group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs).
 
 group_products([P|Ps], MaxH, TopGap, Ls, GPs, [P|DPsTail]) :- 
     group_products(Ps, MaxH, TopGap, Ls, GPs, DPsTail), !.
@@ -134,7 +134,7 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
     bay(MaxSL, _, _, MaxSH),
     shelve(THICK, TG, LG, _IG, _RG),
     (AvalH = 3000 -> 
-	  TopGap is TG % no shelve yet
+	  TopGap is TG % no shelve yet 
 	; TopGap is THICK + TG), % top gap 40+15
 
     maxH_domain(AvalH, MaxH),
@@ -158,6 +158,7 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
 
     Waste #= MaxH + (MaxSL - LG - MaxL),
 	labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
+
 */
 
 	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
@@ -192,7 +193,7 @@ go(NI, N) :- families_sorted(Fs), go(NI, N, Fs).
 go :-  families_sorted(Fs), length(Fs, L), go(1, L, Fs).
 go(N) :- families_sorted(Fs), go(N,1, Fs).
 
-goU(N) :- families(Fs), nth1(N, Fs, F), fd_statistics, reset_timer, bosh([F], Res), !, print_time(Res), Res = res(NBays, NT, CPs, _), nl, length(CPs, L) , print([L, NT, NBays]), fd_statistics.%, statistics.
+goU(N) :- families(Fs), go(N, 1, Fs).
 
 
 
