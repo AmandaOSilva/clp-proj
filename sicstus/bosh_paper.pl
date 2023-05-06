@@ -74,13 +74,13 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
 	NW * RW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
 
     NL * NH * NW #>= Q,
-	NL * NH * NW #=< Q * 2, 
+	(NL * NH * NW) * 3 #=< Q * 5,
     GL #= NL * RL + IG,
     GH #= NH * RH,
     GW #= NW * RW, !,
     group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs).
 
-group_products([P|Ps], MaxH, TopGap, Ls, GPs, [P|DPsTail]) :- 
+group_products([P|Ps], MaxH, TopGap, Ls, GPs, [P|DPsTail]) :-
     group_products(Ps, MaxH, TopGap, Ls, GPs, DPsTail), !.
 
 maxH_domain(AvalH, MaxH) :-
@@ -91,15 +91,15 @@ maxH_domain(AvalH, MaxH) :-
 	  MinHDomain is Diff - X
 	; MinHDomain is 50), % 50 = space between shelves
 	numlist(MinHDomain, 50, AvalH, _, MaxHDomain),
-	list_to_fdset(MaxHDomain, FDS_MaxHDomain),	
+	list_to_fdset(MaxHDomain, FDS_MaxHDomain),
 	MaxH in_set FDS_MaxHDomain.
 
 chosen_constraints([], [], [], 0).
 chosen_constraints([_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V|Vs], [C|Cs], Sum) :-
 	V #= 1 #<=> C,
 	chosen_constraints(GPsTail, Vs, Cs, Sum1),
-	Sum #= Sum1 + C * GL * GW * GH. 
-	
+	Sum #= Sum1 + C * GL * GW * GH.
+
 split_chosen([], [], [], []).
 split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs]) :-
 	split_chosen(GPsTail, Cs, CPs, RPs).
@@ -115,26 +115,26 @@ bosh-knapsack(Coeffs, GPs, Total) :-
         ( foreach(C, Coeffs),
           foreach(GP, GPs),
             fromto(0, S1, S2, Sum)
-        do  
+        do
             GP = _-grouped(GL, _, _, _, _, _),
             S2 #= S1 + C * GL),
             Total #= Sum.
 
-bosh(Fs, res(CPs, DPs)) :- 
+bosh(Fs, res(CPs, DPs)) :-
     max_available_height(AvalH),
     bosh(Fs, AvalH, 1, CPs, DPs).
 
 bosh([], _, _, [], []).
-bosh([[]|Fs], AvalH, N, CPs, DPs) :- 
+bosh([[]|Fs], AvalH, N, CPs, DPs) :-
     bosh(Fs, AvalH, N, CPs, DPs).
 
 % N is number of bays used by current family (acc), NT is current total number os bays used
-bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :- 
-    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, N, Size]), nl,    
+bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
+    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, N, Size]), nl,
     bay(MaxSL, _, _, MaxSH),
     shelve(THICK, TG, LG, _IG, _RG),
-    (AvalH = 3000 -> 
-	  TopGap is TG % no shelve yet 
+    (AvalH = 3000 ->
+	  TopGap is TG % no shelve yet
 	; TopGap is THICK + TG), % top gap 40+15
 
     maxH_domain(AvalH, MaxH),
@@ -147,17 +147,21 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
 	bosh-knapsack(Cs, GPs, MaxL),
 
     append_vars(Vs, GPs, Vs1),
-	append(Vs1, [MaxH], Vars),
+	append([MaxH], Vs1, Vars),
 %	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
 
- /*   
+ /*
     MedUtil #> 0,
-	MedUtil * MaxH * MaxL  #=< FilledSum,	
+	MedUtil * MaxH * MaxL  #=< FilledSum,
 	(MedUtil+1) * MaxH * MaxL #> FilledSum,
 	labeling([maximize(MedUtil), time_out(3000, _Flag)], Vars),
 
     Waste #= MaxH + (MaxSL - LG - MaxL),
 	labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
+
+
+    solve([minimize(MaxH), time_out(3000, _Flag)],
+        [labeling([], [MaxH]), print(MaxH), labeling([down], Cs), print(Cs), labeling([],Ls)]),
 
 */
 
