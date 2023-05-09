@@ -94,17 +94,17 @@ maxH_domain(AvalH, MaxH) :-
 	list_to_fdset(MaxHDomain, FDS_MaxHDomain),
 	MaxH in_set FDS_MaxHDomain.
 
-chosen_constraints([], [], [], 0).
-chosen_constraints([_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V|Vs], [C|Cs], Sum) :-
+chosen_constraints([], [], []).
+chosen_constraints([_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V|Vs], [C|Cs]) :-
 	V #= 1 #<=> C,
-	chosen_constraints(GPsTail, Vs, Cs, Sum1),
-	Sum #= Sum1 + C * GL * GW * GH.
+	chosen_constraints(GPsTail, Vs, Cs).
 
-split_chosen([], [], [], []).
-split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs]) :-
-	split_chosen(GPsTail, Cs, CPs, RPs).
-split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs) :-
-	split_chosen(GPsTail, Cs, CPs, RPs).
+split_chosen([], [], [], [], []).
+split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs], Ls) :-
+	split_chosen(GPsTail, Cs, CPs, RPs, Ls).
+split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs, [GL, GW, GH|Ls]) :-
+    G = grouped(GL, GW, GH, _, _, _),
+	split_chosen(GPsTail, Cs, CPs, RPs, Ls).
 
 append_vars([], [], []).
 append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [GL, GW, GH, V|AllVs]) :-
@@ -140,7 +140,7 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
     maxH_domain(AvalH, MaxH),
     group_products(F, MaxH, TopGap, Ls, GPs, DPs1),
 
-    chosen_constraints(GPs, Vs, Cs, FilledSum),
+    chosen_constraints(GPs, Vs, Cs),
     domain(Vs, 1, 2),
 
 	MaxL #=< MaxSL - LG,
@@ -167,9 +167,9 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
 
 	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
 
-	split_chosen(GPs, Cs, CPs, RPs),
+	split_chosen(GPs, Cs, CPs, RPs, CPVars),
 	%append(CPs, CPVars),
-	labeling([], Ls),
+	labeling([], [MaxH|CPVars]),
 
 	length(CPs, L1),
 	%length(RPs, L2),
@@ -189,13 +189,21 @@ go(NI, N, FsFull) :-
     length(Pre, NI1), append(Pre, Ts, FsFull),
     %length(FsFull, L), LPos = L - NF, 
     length(Fs, N), append(Fs,_, Ts),
-    !, fd_statistics, reset_timer, 
-    bosh(Fs, Res), print_time('Time: '), 
+    !, fd_statistics, reset_timer,
+    bosh(Fs, Res), print_time('Time: '),
     fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), fd_statistics.%, statistics.
 
 go(NI, N) :- families_sorted(Fs), go(NI, N, Fs).
 go :-  families_sorted(Fs), length(Fs, L), go(1, L, Fs).
 go(N) :- families_sorted(Fs), go(N,1, Fs).
+
+goAll :-
+    read_products(Ps),
+    maplist(samsort(by_volume), [Ps], Fs),
+     !, fd_statistics, reset_timer,
+     bosh(Fs, Res), print_time('Time: '),
+     fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), fd_statistics.%, statistics.
+
 
 goU(N) :- families(Fs), go(N, 1, Fs).
 
