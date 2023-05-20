@@ -57,6 +57,35 @@ exporter(N) :-
     write_matrix_in_file('../visualizer/output/bosh_result.py', 'RES', Res).
 
 
+
+% families_sorted(Fs),    exporter_stats(1, 3, Fs).
+exporter_stats :-
+    families_sorted(Fs),
+    length(Fs, L),
+    exporter_stats(1, L, Fs).
+
+exporter_stats(NI, N, FsFull) :- 
+    NI > 0, NI1 is NI - 1,
+    length(Pre, NI1), append(Pre, Ts, FsFull),
+    %length(FsFull, L), LPos = L - NF, 
+    length(Fs, N), append(Fs,_, Ts),
+    ( foreach(F, Fs),
+      foreach(M, Ms) do
+        %F = [product(N, _, _, _, _)|_],
+        length(F, L),
+        reset_timer,
+        bosh([F], Res),
+        get_time(T),
+        %Res = res(CPs, UsedBays, []),
+        Res = res(CPs, []),
+        last(CPs, (UsedBays, N, _)-_),
+        length(CPs, UsedShelves),
+        M = [N, L, T, UsedBays, UsedShelves]
+    ),
+    write_matrix_in_file('../sicstus/output/result.py', 'Ms', Ms).
+
+
+
 %-------------------------------------------------------------------------
 %  Unit tests
 %-------------------------------------------------------------------------
