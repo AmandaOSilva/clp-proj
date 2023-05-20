@@ -94,10 +94,11 @@ maxH_domain(AvalH, MaxH) :-
 	list_to_fdset(MaxHDomain, FDS_MaxHDomain),
 	MaxH in_set FDS_MaxHDomain.
 
-chosen_constraints([], [], []).
-chosen_constraints([_-grouped(GL, GW, GH, _, _, _)|GPsTail], [V|Vs], [C|Cs]) :-
+chosen_constraints([], [], [], 0).
+chosen_constraints([_-grouped(GL, _, _, _, _, _)|GPsTail], [V|Vs], [C|Cs], Sum) :-
 	V #= 1 #<=> C,
-	chosen_constraints(GPsTail, Vs, Cs).
+    Sum #= Sum1 + C * GL,
+	chosen_constraints(GPsTail, Vs, Cs, Sum1).
 
 split_chosen([], [], [], [], []).
 split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs], Ls) :-
@@ -106,19 +107,9 @@ split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs, [GL, GW, GH|Ls]) :-
     G = grouped(GL, GW, GH, _, _, _),
 	split_chosen(GPsTail, Cs, CPs, RPs, Ls).
 
-append_vars([], [], []).
-append_vars([V|Vs], [_-grouped(GL, GW, GH, _, _, _)|GPsTail], [GL, GW, GH, V|AllVs]) :-
-	append_vars(Vs, GPsTail, AllVs).
-
-% TODO: add link to source
-bosh-knapsack(Coeffs, GPs, Total) :-
-        ( foreach(C, Coeffs),
-          foreach(GP, GPs),
-            fromto(0, S1, S2, Sum)
-        do
-            GP = _-grouped(GL, _, _, _, _, _),
-            S2 #= S1 + C * GL),
-            Total #= Sum.
+append_vars([], [], []). 
+append_vars([V|Vs], [GL, GW, GH|Ls], [GL, GW, GH, V|AllVs]) :-
+	append_vars(Vs, Ls, AllVs).
 
 bosh(Fs, res(CPs, DPs)) :-
     max_available_height(AvalH),
@@ -140,44 +131,24 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
     maxH_domain(AvalH, MaxH),
     group_products(F, MaxH, TopGap, Ls, GPs, DPs1),
 
-    chosen_constraints(GPs, Vs, Cs),
+	MaxL #=< MaxSL - LG,
+    chosen_constraints(GPs, Vs, Cs, MaxL),
     domain(Vs, 1, 2),
 
-	MaxL #=< MaxSL - LG,
-	bosh-knapsack(Cs, GPs, MaxL),
 
-    append_vars(Vs, GPs, Vs1),
+    append_vars(Vs, Ls, Vs1),
 	append([MaxH], Vs1, Vars),
-%	append(Vs1, [FilledSum, MaxH, MaxL], Vars),
-
- /*
-    MedUtil #> 0,
-	MedUtil * MaxH * MaxL  #=< FilledSum,
-	(MedUtil+1) * MaxH * MaxL #> FilledSum,
-	labeling([maximize(MedUtil), time_out(3000, _Flag)], Vars),
-
-    Waste #= MaxH + (MaxSL - LG - MaxL),
-	labeling([minimize(Waste), time_out(3000, _Flag)], Vars),
-
-
-    solve([minimize(MaxH), time_out(3000, _Flag)],
-        [labeling([], [MaxH]), print(MaxH), labeling([down], Cs), print(Cs), labeling([],Ls)]),
-
-*/
 
 	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
 
 	split_chosen(GPs, Cs, CPs, RPs, CPVars),
-	%append(CPs, CPVars),
 	labeling([], [MaxH|CPVars]),
 
 	length(CPs, L1),
-	%length(RPs, L2),
-	%print([L1, CPs, L2]), nl, 
     
     ( L1 > 0, !; false ),
-	%check_chosen(CPs, MaxH),
-	ShelveH is AvalH - MaxH,
+ 
+ 	ShelveH is AvalH - MaxH,
 	append(DPs1, RPs, F1),
 	( ShelveH > 0, bosh([F1|Fs], ShelveH, N, CPsTail, DPs), !;
 	( N1 is N + 1,
@@ -187,7 +158,6 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
 go(NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
-    %length(FsFull, L), LPos = L - NF, 
     length(Fs, N), append(Fs,_, Ts),
     !, fd_statistics, reset_timer,
     bosh(Fs, Res), print_time('Time: '),
