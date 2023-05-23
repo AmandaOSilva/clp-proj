@@ -95,10 +95,10 @@ maxH_domain(AvalH, MaxH) :-
 	MaxH in_set FDS_MaxHDomain.
 
 chosen_constraints([], [], [], 0).
-chosen_constraints([_-grouped(GL, _, _, _, _, _)|GPsTail], [V|Vs], [C|Cs], Sum) :-
+chosen_constraints([GL, _, _|Ls], [V|Vs], [C|Cs], Sum) :-
 	V #= 1 #<=> C,
     Sum #= Sum1 + C * GL,
-	chosen_constraints(GPsTail, Vs, Cs, Sum1).
+	chosen_constraints(Ls, Vs, Cs, Sum1).
 
 split_chosen([], [], [], [], []).
 split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs], Ls) :-
@@ -132,7 +132,7 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
     group_products(F, MaxH, TopGap, Ls, GPs, DPs1),
 
 	MaxL #=< MaxSL - LG,
-    chosen_constraints(GPs, Vs, Cs, MaxL),
+    chosen_constraints(Ls, Vs, Cs, MaxL),
     domain(Vs, 1, 2),
 
 
