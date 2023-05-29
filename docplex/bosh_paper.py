@@ -37,9 +37,9 @@ def group_products(model, products, chosen, maxH, avalHeight, topGap):
     dropProds = []
     for i in range(len(products)):
         product = [_, q, l, w, h] = products[i]
-        # if min(product[2:]) > avalHeight - topGap or \
-        #         (q*l*w*h > (avalHeight-topGap)*BAY_DEPTH*(BAY_WIDTH-SHELVE_INTER_GAP - SHELVE_LEFT_GAP)):
-        #     print("droped: ", product, avalHeight, q*l*w*h, (avalHeight-topGap)*BAY_DEPTH*(BAY_WIDTH-SHELVE_INTER_GAP - SHELVE_LEFT_GAP))
+        # if min(product[2:]) > avalHeight - topGap or (
+        #         q* l * w * h > (avalHeight - topGap) * BAY_DEPTH * (BAY_WIDTH - SHELVE_INTER_GAP - SHELVE_LEFT_GAP)):
+        #     # print("droped: ", product, avalHeight, q*l*w*h, (avalHeight-topGap)*BAY_DEPTH*(BAY_WIDTH-SHELVE_INTER_GAP - SHELVE_LEFT_GAP))
         #     dropProds.append(product)
         # else:
         groupedProds.append(group_product(model, product, chosen, i, maxH, topGap))
@@ -53,10 +53,10 @@ def group_product(model, product, chosen, i, maxH, topGap):
     [nL, nH, nW] = model.integer_var_list(3, 1, q, f"numberProds{i}")
     [rL, rH, rW] = rotate(model, [l, w, h], i)
 
-    model.add(chosen[i] * nL * rL + SHELVE_INTER_GAP + SHELVE_LEFT_GAP <= BAY_WIDTH)
-    model.add(chosen[i] * nH * rH + topGap <= maxH)
+    model.add(nL * rL + SHELVE_INTER_GAP + SHELVE_LEFT_GAP <= BAY_WIDTH)
+    model.add(chosen[i]* nH * rH + topGap <= maxH)
 
-    model.add(chosen[i] * nW * rW <= BAY_DEPTH)
+    model.add(nW * rW <= BAY_DEPTH)
     model.add((((nW + 1) * rW > BAY_DEPTH) | ((nH == 1) & (nL == 1) & (nW == q))))
 
     model.add(nL * nH * nW >= q)
@@ -64,13 +64,14 @@ def group_product(model, product, chosen, i, maxH, topGap):
 
     maxDim = q * max([l, w, h]) + 10  # todo
     minDim = min([l, w, h])  # todo
-    # print(product, maxDim)
+    # print(products[i], maxDim)
     [gL, gH, gW] = model.integer_var_list(3, minDim, maxDim, f"grouped{i}")
 
     model.add(gL == nL * rL + SHELVE_INTER_GAP)
     model.add(gH == nH * rH)
     model.add(gW == nW * rW)
-    return [gL, gH, gW, rL, rH, rW]
+    return [gL, gH, gW][::-1]
+#    return [gL, gH, gW, rL, rH, rW][::-1]
 
 
 def getMaxH(model, avalHeight):
@@ -111,21 +112,19 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
     if not groupedProds and dropProds:
         return next_bay(model, avalHeight, bayNumber, [], products, dropProds)
 
-    remainLH = model.integer_var(0, BAY_WIDTH * BAY_AVAL_HEIGHT)
-    maxLH = (BAY_WIDTH - SHELVE_LEFT_GAP) * maxH - remainLH
+    remainL = model.integer_var(0, BAY_WIDTH - SHELVE_LEFT_GAP - 1)
+    maxL = (BAY_WIDTH - SHELVE_LEFT_GAP) - remainL
 
-    model.add(model.scal_prod([groupedProds[i][0] for i in range(groupedSize)], chosen) <= (BAY_WIDTH - SHELVE_LEFT_GAP))
-    #model.add(model.sum([groupedProds[i][0] * chosen[i] for i in range(groupedSize)]) <= (BAY_WIDTH - SHELVE_LEFT_GAP))
-    model.add(model.sum([chosen[i] * groupedProds[i][1] * groupedProds[i][0] for i in range(groupedSize)]) == maxLH)
+    model.add(model.scal_prod([gL for [_, _, gL] in groupedProds], chosen) == maxL)
+ #   model.add(model.scal_prod([gL for [_, _, _, _,_, gL] in groupedProds], chosen) == maxL)
+    #model.add(sum([groupedProds[i][-1] * chosen[i] for i in range(groupedSize)]) == maxL)
 
     # objective = model.count_different(baysIds)
     # objective = model.sum(maxHs) #+ model.count_different(baysIds )*10
     # objective = model.max(baysIds)
     # model.maximize(maxL-maxH*10)
-    # one = model.integer_var(0, 1, "one")
-    # one =
-    model.minimize(remainLH + (1 - model.max(chosen)) * 10000000000)
-    # model.minimize(remainL)
+    # model.minimize(maxH)
+    model.minimize(maxH+remainL*10)
     # vs = model.integer_var_list(size, 1, 2, "vs")
     # for i in range(size):
     #     model.add((vs[i] == 1) - (chosen[i] == 1) != 0)
@@ -155,16 +154,16 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
     # model.add(model.pack(loads, packIds, weights, nonZero))
     # model.add(model.minimize(nonZero))
 
-    starting_point = model.create_empty_solution()
-
-    for c in chosen:#[:size//2]:
-        starting_point.add_integer_var_solution(c, 1)
-    # starting_point.add_integer_var_solution(maxL, 1190)
-    # for e in e2[:(len(e2))]:
-    #     starting_point.add_integer_var_solution(e, 1)
-
-    model.set_starting_point(starting_point)
-    # print(model.refine_conflict())
+    # starting_point = model.create_empty_solution()
+    #
+    # for c in chosen[:len(chosen) // 2][::-1]:
+    #     starting_point.add_integer_var_solution(c, 1)
+    # # starting_point.add_integer_var_solution(maxL, 1190)
+    # # for e in e2[:(len(e2))]:
+    # #     starting_point.add_integer_var_solution(e, 1)
+    #
+    # model.set_starting_point(starting_point)
+   # print(model.refine_conflict())
     solution = model.solve(LogVerbosity='Quiet', SearchType='Auto', Workers=16, TimeLimit=120)
     # solutions = model.start_search(SearchType='DepthFirst', Workers=1, LogVerbosity='Terse', TimeLimit=120)
     # 'DepthFirst', 'Restart', 'MultiPoint', 'IterativeDiving', 'Neighborhood', 'Auto')
@@ -172,7 +171,7 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
     # TimeLimit=600)
     # for solution in solutions:
     status = solution.get_solve_status()
-    print("maxH: {}, remainL: {}, bay: {}".format(solution.get_value(maxH), solution.get_value(remainLH), bayNumber))
+    print("maxH: {}, remainL: {}, bay: {}".format(solution.get_value(maxH), solution.get_value(remainL), bayNumber))
     print([solution.get_value(c) for c in chosen])
     # print([solution.get_value(v) for v in vs])
     # print(sum([solution.get_value(groupedProds[i][0])* solution.get_value(chosen[i]) for i in range(size)]))
