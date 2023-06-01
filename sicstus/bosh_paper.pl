@@ -47,11 +47,11 @@ print_time(Msg):-
 bay(1200, 2400, 650, 3000).
 max_available_height(H) :- bay(_,_,_, H).
 
-% shelve(thickness, top gap, left gap, inter gap, right gap)
-shelve(40, 15, 10, 10, 10).
+% shelf(thickness, top gap, left gap, inter gap, right gap)
+shelf(40, 15, 10, 10, 10).
 
 
-% rotate(+ProductDimensions, -RotateProdutcDimensions)
+% rotate(+ProductDimensions, -RotatedProductDimensions)
 rotate([L, H, W], [RL, RH, RW]) :- 
 	Vs = [IL, IW, IH],
 	%domain(Vs, 1, 3),
@@ -60,12 +60,12 @@ rotate([L, H, W], [RL, RH, RW]) :-
     element(IH, [L,H,W], RH),
     element(IW, [L,H,W], RW).
 
-% group_product(+Product, +MaxH, -GroupedProduct)
+% group_product(+Product, +MaxH, +TopGap, -Variables, -GroupedProducts, -DropedProducts)
 group_products([], _, _, [], [], []) :- !.
 group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
     [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
     bay(SL, _, SW, _),
-    shelve(_THICK, _TG, LG, IG, _RG),
+    shelf(_THICK, _TG, LG, IG, _RG),
     rotate([L, H, W], [RL, RH, RW]), 
 	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
 
@@ -117,14 +117,13 @@ bosh(Fs, res(CPs, DPs)) :-
     bosh(Fs, AvalH, 1, CPs, DPs).
 
 bosh([], _, _, [], []).
-bosh([[]|Fs], AvalH, N, CPs, DPs) :-
-    bosh(Fs, AvalH, N, CPs, DPs).
+bosh([[]|Fs], AvalH, Bay, CPs, DPs) :-
+    bosh(Fs, AvalH, Bay, CPs, DPs).
 
-% N is number of bays used by current family (acc), NT is current total number os bays used
-bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
-    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, N, Size]), nl,
+bosh([F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :-
+    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, Bay, Size]), nl,
     bay(MaxSL, _, _, MaxSH),
-    shelve(THICK, TG, LG, _IG, _RG),
+    shelf(THICK, TG, LG, _IG, _RG),
     (AvalH = 3000 ->
 	  TopGap is TG % no shelve yet
 	; TopGap is THICK + TG), % top gap 40+15
@@ -151,9 +150,9 @@ bosh([F|Fs], AvalH, N, [(N, NF, ShelveH)-CPs|CPsTail], DPs) :-
  
  	ShelveH is AvalH - MaxH,
 	append(DPs1, RPs, F1),
-	( ShelveH > 0, bosh([F1|Fs], ShelveH, N, CPsTail, DPs), !;
-	( N1 is N + 1,
-	  ( bosh([F1|Fs], MaxSH, N1, CPsTail, DPs2), DPs = DPs2; DPs = F1, nl, nl, write(['\'Family shelve not complete, dropped products: \'', DPs]), nl, nl)
+	( ShelveH > 0, bosh([F1|Fs], ShelveH, Bay, CPsTail, DPs), !;
+	( NextBay is Bay + 1,
+	  ( bosh([F1|Fs], MaxSH, NextBay, CPsTail, DPs2), DPs = DPs2; DPs = F1, nl, nl, write(['\'Family shelve not complete, dropped products: \'', DPs]), nl, nl)
 	)).
 
 go(NI, N, FsFull) :- 
@@ -207,12 +206,12 @@ test(rotate_vars, nondet) :-
 % group_product(product(F, Q, L, H, W))
 
 test('group - grounded') :- group_products([product(1, 5, 100, 620, 700)],
-    3000, 15, [product(1, 5, 100, 620, 700)-grouped(710, 500, 620, 700, 100, 620)],[]).
+    3000, 15, [710,500,620], [product(1, 5, 100, 620, 700)-grouped(710, 500, 620, 700, 100, 620)],[]).
 
 test(group) :- 
     MaxH in 0..1000, 
     Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, MaxH, 55,  
+    group_products(Ps, MaxH, 55, [BL,BW,BH],
         [product(1, 7, 100, 620, 700)-grouped(BL, BW, BH, RL, RW, RH)], []),
     MaxH in 155..1000,
     RL in{100}\/{620}\/{700},
@@ -225,12 +224,12 @@ test(group) :-
 test('group - droped prod') :- 
     MaxH in 0..100,
     Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, MaxH, 55, [], [product(1, 7, 100, 620, 700)]).  
+    group_products(Ps, MaxH, 55, [], [], [product(1, 7, 100, 620, 700)]).
 
 test('group - list 2 prod') :- 
     MaxH in 0..100,
     Ps = [product(1, 7, 100, 620, 700), product(1, 2, 10, 620, 70)],
-    group_products(Ps, MaxH, 55,
+    group_products(Ps, MaxH, 55, [BL,BW,BH],
         [product(1, 2, 10, 620, 70)-grouped(BL, BW, BH, RL, RW, RH)],
         [product(1, 7, 100, 620, 700)]),  
     RH = 10,

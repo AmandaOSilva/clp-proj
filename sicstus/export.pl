@@ -33,26 +33,32 @@ process_product(OH, OL, [product(_F, Q, _L, _H, _W)-grouped(GL, GW, GH, RL, RW, 
     append(Color, Colors1, Colors).
 
 
-process_shelve([], [], [], []).
-process_shelve([(_, _, SH)-CPs|GPs], [(0, 0, ShPosH)|Ps], [(1200, 650, 40)|Sizes], ['"y"'|Colors]) :-
-    ShPosH is SH - 40 ,
-    process_product(SH, 10, CPs, Pos, Size, Color),
-    process_shelve(GPs, Ps1, Sizes1, Colors1),
+process_shelves([], [], [], []).
+process_shelves([(_, _, SH)-CPs|GPs], [(0, 0, ShPosH)|Ps], [(SL, SW, THICK)|Sizes], ['"y"'|Colors]) :-
+    bay(SL, _, SW, _),
+    shelf(THICK, _TG, LG, _IG, _RG),
+    ShPosH is SH - THICK ,
+    process_product(SH, LG, CPs, Pos, Size, Color),
+    process_shelves(GPs, Ps1, Sizes1, Colors1),
     append(Pos, Ps1, Ps),
     append(Size, Sizes1, Sizes),
     append(Color, Colors1, Colors).
     
 same_bay((N1,_, _)-_, (N2,_, _)-_) :- N2 = N1.
 
-process_bay([], [], [], []).
-process_bay([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) :-
-    process_shelve(BayCPs, Ps, Sizes, Colors),
-    process_bay(CPs, PsTail, SizesTail, ColorsTail).
+process_bays([], [], [], []).
+process_bays([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) :-
+    bay(SL, SH, SW, AvalH),
+    process_shelves(BayCPs, Ps1, Sizes1, Colors1),
+    append([(0,0,AvalH),(-20, 0, 0), (SL, 0, 0)], Ps1, Ps),
+    append([(SL, SW, 40), (20, SW, SH), (20, SW, SH)], Sizes1, Sizes),
+    append(['"k"', '"grey"', '"grey"'], Colors1, Colors),
+    process_bays(CPs, PsTail, SizesTail, ColorsTail).
 
 exporter(N) :-
     goVis(N,res(CPs, _DPs)), !,
     group(same_bay, CPs, CPsByBay),
-    process_bay(CPsByBay, Ps, Sizes, Colors),
+    process_bays(CPsByBay, Ps, Sizes, Colors),
     Res = [Ps, Sizes, Colors],
     write_matrix_in_file('../visualizer/output/bosh_result.py', 'RES', Res).
 
