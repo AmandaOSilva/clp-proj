@@ -69,16 +69,17 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
     rotate([L, H, W], [RL, RH, RW]), 
 	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
 
-    NL * RL + IG + LG #=< SL ,
-   	NH * RH + TopGap #=< MaxH,
-	NW * RW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
-
-    NL * NH * NW #>= Q,
-	(NL * NH * NW) * 3 #=< Q * 5,
     GL #= NL * RL + IG,
     GH #= NH * RH,
-    GW #= NW * RW, !,
-    group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs).
+    GW #= NW * RW,
+
+    GL + IG + LG #=< SL ,
+   	GH + TopGap #=< MaxH,
+	GW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
+
+    NL * NH * NW #>= Q,
+	(NL * NH * NW) * 31 #=< Q * 50,
+    !, group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs).
 
 group_products([P|Ps], MaxH, TopGap, Ls, GPs, [P|DPsTail]) :-
     group_products(Ps, MaxH, TopGap, Ls, GPs, DPsTail), !.
