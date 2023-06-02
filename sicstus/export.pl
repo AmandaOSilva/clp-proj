@@ -78,14 +78,13 @@ go_all_options(N) :-
                 _Ex, [Time, NBay] = [0,0]), 
               R = [VarsSelectionOption, LabelingOption, N, Time, NBay]
             ; R = [VarsSelectionOption, LabelingOption, N, 0, 0]
-            ), !            
+            ), !, print(R)
       )
 %      append(R1s, R1sFlat)
     ), print(Rs),
     write_matrix_in_file('../sicstus/output/result_all_options.py', 'Rs', Rs).
 
 go_all_options([VarsSelectionOption, LabelingOption], NI, N, FsFull, Time, NBay) :- 
-    print([VarsSelectionOption, LabelingOption, NI]), 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts), !,

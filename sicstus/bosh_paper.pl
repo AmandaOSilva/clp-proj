@@ -110,8 +110,8 @@ append_vars([], [], []).
 append_vars([V|Vs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
 	append_vars(Vs, Gs, AllVs).
 
-% use Gs, no NotCs
-vars_selection(1, Cs, Gs, MaxH, _Vs, Vars) :-
+
+vars_selection(1, Cs, Gs, MaxH, _NotCs, Vars) :-
     append(Cs, Gs, Vs1),
     append(Vs1, [MaxH], Vars).
 
@@ -120,14 +120,13 @@ vars_selection(2, _Cs, Gs, MaxH, NotCs, Vars) :-
     append(Vs1, [MaxH], Vars).
 
 
-% use NotCs, no Gs
-vars_selection(3, Cs, Gs, MaxH, _Vs, Vars) :-
+vars_selection(3, Cs, Gs, MaxH, _NotCs, Vars) :-
     append(Gs, Cs, Vs1),
     append(Vs1, [MaxH], Vars).
 
 % use NotCs, no Gs, Cs last
-vars_selection(4, Cs, Gs, MaxH, _Vs, Vars) :-
-    append(Gs, Cs, Vs1),
+vars_selection(4, _Cs, Gs, MaxH, NotCs, Vars) :-
+    append(Gs, NotCs, Vs1),
     append(Vs1, [MaxH], Vars).
 
 
@@ -157,19 +156,19 @@ bosh_labeling(3, Vars, Cost) :-
 bosh_labeling(4,Vars, Cost) :-
 	labeling([minimize(Cost), time_out(30000, _Flag), enum], [Cost|Vars]).
 
-bosh_labeling(4,Vars, Cost) :-
+bosh_labeling(5,Vars, Cost) :-
 	labeling([minimize(Cost), time_out(30000, _Flag), enum, down], [Cost|Vars]).
 
-bosh_labeling(5,Vars, Cost) :-
+bosh_labeling(6,Vars, Cost) :-
 	labeling([minimize(Cost), time_out(30000, _Flag), enum, median], [Cost|Vars]).
 
-bosh_labeling(6,Vars, Cost) :-
+bosh_labeling(7,Vars, Cost) :-
 	labeling([minimize(Cost), time_out(30000, _Flag), bisect], [Cost|Vars]).
 
-bosh_labeling(7,Vars, Cost) :-
+bosh_labeling(8,Vars, Cost) :-
 	labeling([minimize(Cost), time_out(30000, _Flag), bisect, down], [Cost|Vars]).
 
-bosh_labeling(8,Vars, Cost) :-
+bosh_labeling(9,Vars, Cost) :-
 	labeling([minimize(Cost), time_out(30000, _Flag), bisect, median], [Cost|Vars]).
 
 
@@ -202,8 +201,8 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
 
     % maximum(CsMax, Cs),
     % Cost #= MaxH + RemainL + (1-CsMax)* 1000000,
-    %Cost #= MaxH + RemainL,
-    Cost #= MaxH,
+    Cost #= MaxH + RemainL,
+    %Cost #= MaxH,
     bosh_labeling(LabelingOption, Vars, Cost),
 	%labeling([minimize(Cost), time_out(3000, _Flag)], Vars),
     %print([RemainL, Cost, MaxH]),
