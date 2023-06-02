@@ -3,10 +3,10 @@
 
 
 %print_time(Res), 
-goVis(N, Res) :-  
+goVis([VarsSelectionOption, LabelingOption], N, Res) :-  
     fd_statistics, reset_timer, 
     families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
-    bosh([F], Res), !, Res = res(GPs, _), 
+    bosh([VarsSelectionOption, LabelingOption], [F], Res), !, Res = res(GPs, _), 
     nl, length(GPs, L), print([L]), fd_statistics.%, statistics.
 
 
@@ -55,8 +55,8 @@ process_bays([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) 
     append(['"k"', '"grey"', '"grey"'], Colors1, Colors),
     process_bays(CPs, PsTail, SizesTail, ColorsTail).
 
-exporter(N) :-
-    goVis(N,res(CPs, _DPs)), !,
+exporter([VarsSelectionOption, LabelingOption], N) :-
+    goVis([VarsSelectionOption, LabelingOption], N,res(CPs, _DPs)), !,
     group(same_bay, CPs, CPsByBay),
     process_bays(CPsByBay, Ps, Sizes, Colors),
     Res = [Ps, Sizes, Colors],

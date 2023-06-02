@@ -28,9 +28,9 @@ For each shelf in turn:
 */
 
 reset_timer:-
-	statistics(total_runtime, _).
+	statistics(walltime, _).
 get_time(TS) :- 
-	statistics(total_runtime,[_,T]),
+	statistics(walltime,[_,T]),
 	TS is ((T//10)*10)/1000.
 
 print_time(Msg):-
@@ -112,15 +112,54 @@ append_vars([], [], []).
 append_vars([V|Vs], [GL, GW, GH|Ls], [GL, GW, GH, V|AllVs]) :-
 	append_vars(Vs, Ls, AllVs).
 
-bosh(Fs, res(CPs, DPs)) :-
+% use Ls, no Vs
+vars_selection(1, Cs, Ls, MaxH, _Vs, Vars) :-
+    append(Cs, Ls, Vs1),
+    append([MaxH], Vs1, Vars).
+
+vars_selection(2, _Cs, Ls, MaxH, Vs, Vars) :-
+    append(Vs, Ls, Vs1),
+    append([MaxH], Vs1, Vars).
+
+
+% use Vs, no Ls
+vars_selection(3, Cs, Ls, MaxH, _Vs, Vars) :-
+    append(Ls, Cs, Vs1),
+    append([MaxH], Vs1, Vars).
+
+% use Vs, no Ls, Cs last
+vars_selection(4, Cs, Ls, MaxH, _Vs, Vars) :-
+    append(Ls, Cs, Vs1),
+    append([MaxH], Vs1, Vars).
+
+% weaving Vs and Ls (BEST)
+vars_selection(9, _Cs, Ls, MaxH, Vs, Vars) :-
+    append_vars(Vs, Ls, Vs1),
+	append([MaxH], Vs1, Vars).
+
+bosh_labeling(1, Vars, Cost) :-
+	labeling([minimize(Cost), time_out(10000, _Flag)], Vars).
+
+bosh_labeling(2, Vars, Cost) :-
+	labeling([minimize(Cost), time_out(10000, _Flag), down], Vars).
+
+bosh_labeling(3,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(10000, _Flag), bisect], Vars).
+
+bosh_labeling(4,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(10000, _Flag), bisect, down], Vars).
+
+
+bosh([VarsSelectionOption, LabelingOption], Fs, res(CPs, DPs)) :-
     max_available_height(AvalH),
-    bosh(Fs, AvalH, 1, CPs, DPs).
+    bosh([VarsSelectionOption, LabelingOption], Fs, AvalH, 1, CPs, DPs).
 
-bosh([], _, _, [], []).
-bosh([[]|Fs], AvalH, Bay, CPs, DPs) :-
-    bosh(Fs, AvalH, Bay, CPs, DPs).
 
-bosh([F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :-
+bosh(_, [], _, _, [], []).
+bosh([VarsSelectionOption, LabelingOption], [[]|Fs], AvalH, Bay, CPs, DPs) :-
+    bosh([VarsSelectionOption, LabelingOption], Fs, AvalH, Bay, CPs, DPs).
+
+bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :-
     length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, Bay, Size]), nl,
     bay(MaxSL, _, _, MaxSH),
     shelf(THICK, TG, LG, _IG, _RG),
@@ -135,47 +174,53 @@ bosh([F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :-
     chosen_constraints(Ls, Vs, Cs, MaxL),
     domain(Vs, 1, 2),
 
+    vars_selection(VarsSelectionOption, Cs, Ls, MaxH, Vs, Vars),
 
-    append_vars(Vs, Ls, Vs1),
-	append([MaxH], Vs1, Vars),
+   % Cost #= MaxH +(MaxSL - LG - MaxL),
+    Cost #= MaxH,
+    bosh_labeling(LabelingOption, Vars, Cost),
+	%labeling([minimize(Cost), time_out(3000, _Flag)], Vars),
 
-	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
-
-	split_chosen(GPs, Cs, CPs, RPs, CPVars),
-	labeling([], [MaxH|CPVars]),
+	split_chosen(GPs, Cs, CPs, RPs, _CPVars),
+	%labeling([], [MaxH|CPVars]),
 
 	length(CPs, L1),
-    
+
     ( L1 > 0, !; false ),
  
  	ShelveH is AvalH - MaxH,
 	append(DPs1, RPs, F1),
-	( ShelveH > 0, bosh([F1|Fs], ShelveH, Bay, CPsTail, DPs), !;
+	( ShelveH > 0, bosh([VarsSelectionOption, LabelingOption], [F1|Fs], ShelveH, Bay, CPsTail, DPs), !;
 	( NextBay is Bay + 1,
-	  ( bosh([F1|Fs], MaxSH, NextBay, CPsTail, DPs2), DPs = DPs2; DPs = F1, nl, nl, write(['\'Family shelve not complete, dropped products: \'', DPs]), nl, nl)
+	  ( bosh([VarsSelectionOption, LabelingOption], [F1|Fs], MaxSH, NextBay, CPsTail, DPs2), DPs = DPs2; DPs = F1, nl, nl, write(['\'Family shelve not complete, dropped products: \'', DPs]), nl, nl)
 	)).
 
-go(NI, N, FsFull) :- 
+go([VarsSelectionOption, LabelingOption], NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
-    length(Fs, N), append(Fs,_, Ts),
-    !, fd_statistics, reset_timer,
-    bosh(Fs, Res), print_time('Time: '),
-    fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), fd_statistics.%, statistics.
+    length(Fs, N), append(Fs,_, Ts), !,
+    %set_prolog_flag(gc, off),
+    %statistics, 
+    fd_statistics, reset_timer,
+    bosh([VarsSelectionOption, LabelingOption], Fs, Res), print_time('Time: '),
+    %set_prolog_flag(gc,on), 
+    fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), 
+    fd_statistics.
+    %statistics.
 
-go(NI, N) :- families_sorted(Fs), go(NI, N, Fs).
-go :-  families_sorted(Fs), length(Fs, L), go(1, L, Fs).
-go(N) :- families_sorted(Fs), go(N,1, Fs).
+go([VarsSelectionOption, LabelingOption], NI, N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], NI, N, Fs).
+go([VarsSelectionOption, LabelingOption]) :-  families_sorted(Fs), length(Fs, L), go([VarsSelectionOption, LabelingOption], 1, L, Fs).
+go([VarsSelectionOption, LabelingOption], N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], N, 1, Fs).
 
-goAll :-
+goAll([VarsSelectionOption, LabelingOption]) :-
     read_products(Ps),
     maplist(samsort(by_volume), [Ps], Fs),
      !, fd_statistics, reset_timer,
-     bosh(Fs, Res), print_time('Time: '),
+     bosh([VarsSelectionOption, LabelingOption], Fs, Res), print_time('Time: '),
      fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), fd_statistics.%, statistics.
 
 
-goU(N) :- families(Fs), go(N, 1, Fs).
+goU([VarsSelectionOption, LabelingOption], N) :- families(Fs), go([VarsSelectionOption, LabelingOption], N, 1, Fs).
 
 
 
