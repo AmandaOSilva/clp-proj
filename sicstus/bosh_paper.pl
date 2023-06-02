@@ -94,8 +94,8 @@ maxH_domain(AvalH, MaxH) :-
 	MaxH in_set FDS_MaxHDomain.
 
 chosen_constraints([], [], [], 0).
-chosen_constraints([GL, _, _|Gs], [V|NotCs], [C|Cs], Sum) :-
-	V #= 1 #<=> C,
+chosen_constraints([GL, _, _|Gs], [NotC|NotCs], [C|Cs], Sum) :-
+	NotC #= 1 #<=> C,
     Sum #= Sum1 + C * GL,
 	chosen_constraints(Gs, NotCs, Cs, Sum1).
 
@@ -107,8 +107,8 @@ split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs, [GL, GW, GH|Gs]) :-
 	split_chosen(GPsTail, Cs, CPs, RPs, Gs).
 
 append_vars([], [], []). 
-append_vars([V|NotCs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
-	append_vars(NotCs, Gs, AllVs).
+append_vars([V|Vs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
+	append_vars(Vs, Gs, AllVs).
 
 % use Gs, no NotCs
 vars_selection(1, Cs, Gs, MaxH, _Vs, Vars) :-
