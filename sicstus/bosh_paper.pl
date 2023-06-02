@@ -113,63 +113,41 @@ append_vars([V|Vs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
 
 vars_selection(1, Cs, Gs, MaxH, _NotCs, Vars) :-
     append(Cs, Gs, Vs1),
-    append(Vs1, [MaxH], Vars).
+    append([MaxH], Vs1, Vars).
 
 vars_selection(2, _Cs, Gs, MaxH, NotCs, Vars) :-
     append(NotCs, Gs, Vs1),
-    append(Vs1, [MaxH], Vars).
+    append([MaxH], Vs1, Vars).
 
 
 vars_selection(3, Cs, Gs, MaxH, _NotCs, Vars) :-
     append(Gs, Cs, Vs1),
-    append(Vs1, [MaxH], Vars).
+    append([MaxH], Vs1, Vars).
 
 % use NotCs, no Gs, Cs last
 vars_selection(4, _Cs, Gs, MaxH, NotCs, Vars) :-
     append(Gs, NotCs, Vs1),
-    append(Vs1, [MaxH], Vars).
-
+    append([MaxH], Vs1, Vars).
 
 % weaving NotCs and Gs (BEST, with maxH as Cost funciont)
-vars_selection(9, _Cs, Gs, MaxH, NotCs, Vars) :-
+vars_selection(5, _Cs, Gs, MaxH, NotCs, Vars) :-
     append_vars(NotCs, Gs, Vs1),
 	append([MaxH], Vs1, Vars).
 
-vars_selection(10, _Cs, Gs, MaxH, NotCs, Vars) :-
-    append_vars(NotCs, Gs, Vs1),
-	append(Vs1, [MaxH], Vars).
+
+labeling_options(1, []).
+labeling_options(2, [down]).
+labeling_options(3, [enum]).
+labeling_options(4, [enum, down]).
+labeling_options(5, [bisect]).
+labeling_options(6, [bisect, down]).
 
 
+bosh_labeling(OptNumber, Vars, Cost) :-
+    labeling_options(OptNumber, Opt),
+    append([Cost], Vars, VarsAll),
+	labeling([minimize(Cost), time_out(30000, _Flag)|Opt], VarsAll).
 
-bosh_labeling(1, Vars, Cost) :-
-    append(Vars, [Cost], VarsAll),
-	labeling([minimize(Cost), time_out(30000, _Flag)], VarsAll).
-
-bosh_labeling(2, Vars, Cost) :-
-    append(Vars, [Cost], VarsAll),
-	labeling([minimize(Cost), time_out(30000, _Flag), down], VarsAll).
-
-bosh_labeling(3, Vars, Cost) :-
-    append(Vars, [Cost], VarsAll),
-	labeling([minimize(Cost), time_out(30000, _Flag), median], VarsAll).
-
-bosh_labeling(4,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(30000, _Flag), enum], [Cost|Vars]).
-
-bosh_labeling(5,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(30000, _Flag), enum, down], [Cost|Vars]).
-
-bosh_labeling(6,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(30000, _Flag), enum, median], [Cost|Vars]).
-
-bosh_labeling(7,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(30000, _Flag), bisect], [Cost|Vars]).
-
-bosh_labeling(8,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(30000, _Flag), bisect, down], [Cost|Vars]).
-
-bosh_labeling(9,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(30000, _Flag), bisect, median], [Cost|Vars]).
 
 
 bosh([VarsSelectionOption, LabelingOption], Fs, res(CPs, DPs)) :-
@@ -201,8 +179,8 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
 
     % maximum(CsMax, Cs),
     % Cost #= MaxH + RemainL + (1-CsMax)* 1000000,
-    Cost #= MaxH + RemainL,
-    %Cost #= MaxH,
+    %Cost #= MaxH + RemainL,
+    Cost #= MaxH,
     bosh_labeling(LabelingOption, Vars, Cost),
 	%labeling([minimize(Cost), time_out(3000, _Flag)], Vars),
     %print([RemainL, Cost, MaxH]),
@@ -234,11 +212,14 @@ go([VarsSelectionOption, LabelingOption], NI, N, FsFull) :-
     %statistics.
 
 
-
-
 go([VarsSelectionOption, LabelingOption], NI, N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], NI, N, Fs).
 go([VarsSelectionOption, LabelingOption]) :-  families_sorted(Fs), length(Fs, L), go([VarsSelectionOption, LabelingOption], 1, L, Fs).
 go([VarsSelectionOption, LabelingOption], N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], N, 1, Fs).
+
+go(N) :- go([9,1], N).
+go :- go([9,1]).
+
+
 
 goAll([VarsSelectionOption, LabelingOption]) :-
     read_products(Ps),

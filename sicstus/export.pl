@@ -66,12 +66,12 @@ go_export([VarsSelectionOption, LabelingOption], N) :-
 go_all_options(N) :-
     families_sorted(Fs),
     %nth1(N, Fs, F),
-    %( foreach(VarsSelectionOption, [10,9]),
-    ( foreach(VarsSelectionOption, [1,2,3,4,9,10]),
+    %( foreach(VarsSelectionOption, [9]),
+    ( foreach(VarsSelectionOption, [1,2,3,4,5]),
       foreach(R1s, Rs),
       param(N, Fs) do
 %      ( foreach(LabelingOption, [1,3]),
-      ( foreach(LabelingOption, [1,2,3,4,5,6,7,8]),
+      ( foreach(LabelingOption, [1,2,3,4,5,6]),
         foreach(R, R1s),
         param(N, Fs, VarsSelectionOption) do
             ( catch(go_all_options([VarsSelectionOption, LabelingOption], N, 1, Fs, Time, NBay),
