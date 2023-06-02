@@ -94,10 +94,10 @@ maxH_domain(AvalH, MaxH) :-
 	MaxH in_set FDS_MaxHDomain.
 
 chosen_constraints([], [], [], 0).
-chosen_constraints([GL, _, _|Gs], [V|Vs], [C|Cs], Sum) :-
+chosen_constraints([GL, _, _|Gs], [V|NotCs], [C|Cs], Sum) :-
 	V #= 1 #<=> C,
     Sum #= Sum1 + C * GL,
-	chosen_constraints(Gs, Vs, Cs, Sum1).
+	chosen_constraints(Gs, NotCs, Cs, Sum1).
 
 split_chosen([], [], [], [], []).
 split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs], Gs) :-
@@ -107,37 +107,37 @@ split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs, [GL, GW, GH|Gs]) :-
 	split_chosen(GPsTail, Cs, CPs, RPs, Gs).
 
 append_vars([], [], []). 
-append_vars([V|Vs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
-	append_vars(Vs, Gs, AllVs).
+append_vars([V|NotCs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
+	append_vars(NotCs, Gs, AllVs).
 
-% use Gs, no Vs
+% use Gs, no NotCs
 vars_selection(1, Cs, Gs, MaxH, _Vs, Vars) :-
     append(Cs, Gs, Vs1),
     append(Vs1, [MaxH], Vars).
 
-vars_selection(2, _Cs, Gs, MaxH, Vs, Vars) :-
-    append(Vs, Gs, Vs1),
+vars_selection(2, _Cs, Gs, MaxH, NotCs, Vars) :-
+    append(NotCs, Gs, Vs1),
     append(Vs1, [MaxH], Vars).
 
 
-% use Vs, no Gs
+% use NotCs, no Gs
 vars_selection(3, Cs, Gs, MaxH, _Vs, Vars) :-
     append(Gs, Cs, Vs1),
     append(Vs1, [MaxH], Vars).
 
-% use Vs, no Gs, Cs last
+% use NotCs, no Gs, Cs last
 vars_selection(4, Cs, Gs, MaxH, _Vs, Vars) :-
     append(Gs, Cs, Vs1),
     append(Vs1, [MaxH], Vars).
 
 
-% weaving Vs and Gs (BEST, with maxH as Cost funciont)
-vars_selection(9, _Cs, Gs, MaxH, Vs, Vars) :-
-    append_vars(Vs, Gs, Vs1),
+% weaving NotCs and Gs (BEST, with maxH as Cost funciont)
+vars_selection(9, _Cs, Gs, MaxH, NotCs, Vars) :-
+    append_vars(NotCs, Gs, Vs1),
 	append([MaxH], Vs1, Vars).
 
-vars_selection(10, _Cs, Gs, MaxH, Vs, Vars) :-
-    append_vars(Vs, Gs, Vs1),
+vars_selection(10, _Cs, Gs, MaxH, NotCs, Vars) :-
+    append_vars(NotCs, Gs, Vs1),
 	append(Vs1, [MaxH], Vars).
 
 
@@ -193,17 +193,17 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
     maxH_domain(AvalH, MaxH),
     group_products(F, MaxH, TopGap, Gs, GPs, DPs1),
 
-    chosen_constraints(Gs, Vs, Cs, MaxL),
+    chosen_constraints(Gs, NotCs, Cs, MaxL),
     RemainL #>= 0,
 	RemainL #= MaxSL - LG - MaxL, 
-    domain(Vs, 1, 2),
+    domain(NotCs, 1, 2),
 
-    vars_selection(VarsSelectionOption, Cs, Gs, MaxH, Vs, Vars),
+    vars_selection(VarsSelectionOption, Cs, Gs, MaxH, NotCs, Vars),
 
     % maximum(CsMax, Cs),
     % Cost #= MaxH + RemainL + (1-CsMax)* 1000000,
-    Cost #= MaxH + RemainL,
-    %Cost #= MaxH,
+    %Cost #= MaxH + RemainL,
+    Cost #= MaxH,
     bosh_labeling(LabelingOption, Vars, Cost),
 	%labeling([minimize(Cost), time_out(3000, _Flag)], Vars),
     %print([RemainL, Cost, MaxH]),
