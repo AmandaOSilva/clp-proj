@@ -55,7 +55,7 @@ process_bays([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) 
     append(['"k"', '"grey"', '"grey"'], Colors1, Colors),
     process_bays(CPs, PsTail, SizesTail, ColorsTail).
 
-exporter([VarsSelectionOption, LabelingOption], N) :-
+go_export([VarsSelectionOption, LabelingOption], N) :-
     goVis([VarsSelectionOption, LabelingOption], N,res(CPs, _DPs)), !,
     group(same_bay, CPs, CPsByBay),
     process_bays(CPsByBay, Ps, Sizes, Colors),
@@ -63,14 +63,52 @@ exporter([VarsSelectionOption, LabelingOption], N) :-
     write_matrix_in_file('../visualizer/output/bosh_result.py', 'RES', Res).
 
 
+go_all_options(N) :-
+    families_sorted(Fs),
+    %nth1(N, Fs, F),
+    %( foreach(VarsSelectionOption, [10,9]),
+    ( foreach(VarsSelectionOption, [1,2,3,4,9,10]),
+      foreach(R1s, Rs),
+      param(N, Fs) do
+%      ( foreach(LabelingOption, [1,3]),
+      ( foreach(LabelingOption, [1,2,3,4,5,6,7,8]),
+        foreach(R, R1s),
+        param(N, Fs, VarsSelectionOption) do
+            ( catch(go_all_options([VarsSelectionOption, LabelingOption], N, 1, Fs, Time, NBay),
+                _Ex, [Time, NBay] = [0,0]), 
+              R = [VarsSelectionOption, LabelingOption, N, Time, NBay]
+            ; R = [VarsSelectionOption, LabelingOption, N, 0, 0]
+            ), !            
+      )
+%      append(R1s, R1sFlat)
+    ), print(Rs),
+    write_matrix_in_file('../sicstus/output/result_all_options.py', 'Rs', Rs).
 
-% families_sorted(Fs),    exporter_stats(1, 3, Fs).
-exporter_stats :-
+go_all_options([VarsSelectionOption, LabelingOption], NI, N, FsFull, Time, NBay) :- 
+    print([VarsSelectionOption, LabelingOption, NI]), 
+    NI > 0, NI1 is NI - 1,
+    length(Pre, NI1), append(Pre, Ts, FsFull),
+    length(Fs, N), append(Fs,_, Ts), !,
+    %set_prolog_flag(gc, off),
+    %statistics, 
+    reset_timer,
+    bosh([VarsSelectionOption, LabelingOption], Fs, Res), !,
+    get_time(Time),
+    %Res = res(CPs, UsedBays, []),
+    Res = res(CPs, []),
+    last(CPs, (NBay, _, _)-_).
+
+
+
+
+
+% families_sorted(Fs),    go_timer_stats(1, 3, Fs).
+go_timer_stats([VarsSelectionOption, LabelingOption]) :-
     families_sorted(Fs),
     length(Fs, L),
-    exporter_stats(1, L, Fs).
+    go_timer_stats([VarsSelectionOption, LabelingOption], 1, L, Fs).
 
-exporter_stats(NI, N, FsFull) :- 
+go_timer_stats([VarsSelectionOption, LabelingOption], NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     %length(FsFull, L), LPos = L - NF, 
@@ -80,7 +118,7 @@ exporter_stats(NI, N, FsFull) :-
         %F = [product(N, _, _, _, _)|_],
         length(F, L),
         reset_timer,
-        bosh([F], Res),
+        bosh([VarsSelectionOption, LabelingOption], [F], Res),
         get_time(T),
         %Res = res(CPs, UsedBays, []),
         Res = res(CPs, []),
@@ -88,7 +126,7 @@ exporter_stats(NI, N, FsFull) :-
         length(CPs, UsedShelves),
         M = [N, L, T, UsedBays, UsedShelves]
     ),
-    write_matrix_in_file('../sicstus/output/result.py', 'Ms', Ms).
+    write_matrix_in_file('../sicstus/output/result_stats.py', 'Ms', Ms).
 
 
 

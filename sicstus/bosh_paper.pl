@@ -53,16 +53,14 @@ shelf(40, 15, 10, 10, 10).
 
 % rotate(+ProductDimensions, -RotatedProductDimensions)
 rotate([L, H, W], [RL, RH, RW]) :- 
-	Vs = [IL, IW, IH],
-	%domain(Vs, 1, 3),
-    all_distinct(Vs),
+    all_distinct([IL, IW, IH]),
     element(IL, [L,H,W], RL),
     element(IH, [L,H,W], RH),
     element(IW, [L,H,W], RW).
 
 % group_product(+Product, +MaxH, +TopGap, -Variables, -GroupedProducts, -DropedProducts)
 group_products([], _, _, [], [], []) :- !.
-group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
+group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Gs],
     [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
     bay(SL, _, SW, _),
     shelf(_THICK, _TG, LG, IG, _RG),
@@ -79,10 +77,10 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxH, TopGap, [GL, GW, GH|Ls],
 
     NL * NH * NW #>= Q,
 	(NL * NH * NW) * 31 #=< Q * 50,
-    !, group_products(Ps, MaxH, TopGap, Ls, GPsTail, DPs).
+    !, group_products(Ps, MaxH, TopGap, Gs, GPsTail, DPs).
 
-group_products([P|Ps], MaxH, TopGap, Ls, GPs, [P|DPsTail]) :-
-    group_products(Ps, MaxH, TopGap, Ls, GPs, DPsTail), !.
+group_products([P|Ps], MaxH, TopGap, Gs, GPs, [P|DPsTail]) :-
+    group_products(Ps, MaxH, TopGap, Gs, GPs, DPsTail), !.
 
 maxH_domain(AvalH, MaxH) :-
     bay(_, BH, _, BAH),
@@ -96,58 +94,83 @@ maxH_domain(AvalH, MaxH) :-
 	MaxH in_set FDS_MaxHDomain.
 
 chosen_constraints([], [], [], 0).
-chosen_constraints([GL, _, _|Ls], [V|Vs], [C|Cs], Sum) :-
+chosen_constraints([GL, _, _|Gs], [V|Vs], [C|Cs], Sum) :-
 	V #= 1 #<=> C,
     Sum #= Sum1 + C * GL,
-	chosen_constraints(Ls, Vs, Cs, Sum1).
+	chosen_constraints(Gs, Vs, Cs, Sum1).
 
 split_chosen([], [], [], [], []).
-split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs], Ls) :-
-	split_chosen(GPsTail, Cs, CPs, RPs, Ls).
-split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs, [GL, GW, GH|Ls]) :-
+split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs], Gs) :-
+	split_chosen(GPsTail, Cs, CPs, RPs, Gs).
+split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs, [GL, GW, GH|Gs]) :-
     G = grouped(GL, GW, GH, _, _, _),
-	split_chosen(GPsTail, Cs, CPs, RPs, Ls).
+	split_chosen(GPsTail, Cs, CPs, RPs, Gs).
 
 append_vars([], [], []). 
-append_vars([V|Vs], [GL, GW, GH|Ls], [GL, GW, GH, V|AllVs]) :-
-	append_vars(Vs, Ls, AllVs).
+append_vars([V|Vs], [GL, GW, GH|Gs], [GL, GW, GH, V|AllVs]) :-
+	append_vars(Vs, Gs, AllVs).
 
-% use Ls, no Vs
-vars_selection(1, Cs, Ls, MaxH, _Vs, Vars) :-
-    append(Cs, Ls, Vs1),
-    append([MaxH], Vs1, Vars).
+% use Gs, no Vs
+vars_selection(1, Cs, Gs, MaxH, _Vs, Vars) :-
+    append(Cs, Gs, Vs1),
+    append(Vs1, [MaxH], Vars).
 
-vars_selection(2, _Cs, Ls, MaxH, Vs, Vars) :-
-    append(Vs, Ls, Vs1),
-    append([MaxH], Vs1, Vars).
+vars_selection(2, _Cs, Gs, MaxH, Vs, Vars) :-
+    append(Vs, Gs, Vs1),
+    append(Vs1, [MaxH], Vars).
 
 
-% use Vs, no Ls
-vars_selection(3, Cs, Ls, MaxH, _Vs, Vars) :-
-    append(Ls, Cs, Vs1),
-    append([MaxH], Vs1, Vars).
+% use Vs, no Gs
+vars_selection(3, Cs, Gs, MaxH, _Vs, Vars) :-
+    append(Gs, Cs, Vs1),
+    append(Vs1, [MaxH], Vars).
 
-% use Vs, no Ls, Cs last
-vars_selection(4, Cs, Ls, MaxH, _Vs, Vars) :-
-    append(Ls, Cs, Vs1),
-    append([MaxH], Vs1, Vars).
+% use Vs, no Gs, Cs last
+vars_selection(4, Cs, Gs, MaxH, _Vs, Vars) :-
+    append(Gs, Cs, Vs1),
+    append(Vs1, [MaxH], Vars).
 
-% weaving Vs and Ls (BEST)
-vars_selection(9, _Cs, Ls, MaxH, Vs, Vars) :-
-    append_vars(Vs, Ls, Vs1),
+
+% weaving Vs and Gs (BEST, with maxH as Cost funciont)
+vars_selection(9, _Cs, Gs, MaxH, Vs, Vars) :-
+    append_vars(Vs, Gs, Vs1),
 	append([MaxH], Vs1, Vars).
 
+vars_selection(10, _Cs, Gs, MaxH, Vs, Vars) :-
+    append_vars(Vs, Gs, Vs1),
+	append(Vs1, [MaxH], Vars).
+
+
+
 bosh_labeling(1, Vars, Cost) :-
-	labeling([minimize(Cost), time_out(10000, _Flag)], Vars).
+    append(Vars, [Cost], VarsAll),
+	labeling([minimize(Cost), time_out(30000, _Flag)], VarsAll).
 
 bosh_labeling(2, Vars, Cost) :-
-	labeling([minimize(Cost), time_out(10000, _Flag), down], Vars).
+    append(Vars, [Cost], VarsAll),
+	labeling([minimize(Cost), time_out(30000, _Flag), down], VarsAll).
 
-bosh_labeling(3,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(10000, _Flag), bisect], Vars).
+bosh_labeling(3, Vars, Cost) :-
+    append(Vars, [Cost], VarsAll),
+	labeling([minimize(Cost), time_out(30000, _Flag), median], VarsAll).
 
 bosh_labeling(4,Vars, Cost) :-
-	labeling([minimize(Cost), time_out(10000, _Flag), bisect, down], Vars).
+	labeling([minimize(Cost), time_out(30000, _Flag), enum], [Cost|Vars]).
+
+bosh_labeling(4,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(30000, _Flag), enum, down], [Cost|Vars]).
+
+bosh_labeling(5,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(30000, _Flag), enum, median], [Cost|Vars]).
+
+bosh_labeling(6,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(30000, _Flag), bisect], [Cost|Vars]).
+
+bosh_labeling(7,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(30000, _Flag), bisect, down], [Cost|Vars]).
+
+bosh_labeling(8,Vars, Cost) :-
+	labeling([minimize(Cost), time_out(30000, _Flag), bisect, median], [Cost|Vars]).
 
 
 bosh([VarsSelectionOption, LabelingOption], Fs, res(CPs, DPs)) :-
@@ -168,19 +191,22 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
 	; TopGap is THICK + TG), % top gap 40+15
 
     maxH_domain(AvalH, MaxH),
-    group_products(F, MaxH, TopGap, Ls, GPs, DPs1),
+    group_products(F, MaxH, TopGap, Gs, GPs, DPs1),
 
-	MaxL #=< MaxSL - LG,
-    chosen_constraints(Ls, Vs, Cs, MaxL),
+    chosen_constraints(Gs, Vs, Cs, MaxL),
+    RemainL #>= 0,
+	RemainL #= MaxSL - LG - MaxL, 
     domain(Vs, 1, 2),
 
-    vars_selection(VarsSelectionOption, Cs, Ls, MaxH, Vs, Vars),
+    vars_selection(VarsSelectionOption, Cs, Gs, MaxH, Vs, Vars),
 
-   % Cost #= MaxH +(MaxSL - LG - MaxL),
-    Cost #= MaxH,
+    % maximum(CsMax, Cs),
+    % Cost #= MaxH + RemainL + (1-CsMax)* 1000000,
+    Cost #= MaxH + RemainL,
+    %Cost #= MaxH,
     bosh_labeling(LabelingOption, Vars, Cost),
 	%labeling([minimize(Cost), time_out(3000, _Flag)], Vars),
-
+    %print([RemainL, Cost, MaxH]),
 	split_chosen(GPs, Cs, CPs, RPs, _CPVars),
 	%labeling([], [MaxH|CPVars]),
 
@@ -207,6 +233,9 @@ go([VarsSelectionOption, LabelingOption], NI, N, FsFull) :-
     fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), 
     fd_statistics.
     %statistics.
+
+
+
 
 go([VarsSelectionOption, LabelingOption], NI, N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], NI, N, Fs).
 go([VarsSelectionOption, LabelingOption]) :-  families_sorted(Fs), length(Fs, L), go([VarsSelectionOption, LabelingOption], 1, L, Fs).
