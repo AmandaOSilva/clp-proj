@@ -53,9 +53,8 @@ shelve(40, 15, 10, 10, 10).
 
 % rotate(+ProductDimensions, -RotateProdutcDimensions)
 rotate([L, H, W], [RL, RH, RW]) :- 
-	Vs = [IL, IW, IH],
 	%domain(Vs, 1, 3),
-    all_distinct(Vs),
+    all_distinct([IL, IW, IH]),
     element(IL, [L,H,W], RL),
     element(IH, [L,H,W], RH),
     element(IW, [L,H,W], RW).
@@ -67,30 +66,37 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
         [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
     
     element(V, MaxHs, MaxH),
+
     bay(SL, _, SW, _),
     shelve(_THICK, _TG, LG, IG, _RG),
-    rotate([L, H, W], [RL, RH, RW]), 
-	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
-        
-    NL * RL + IG + LG #=< SL ,
-   	NH * RH + TopGap #=< MaxH,
-	NW * RW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
 
-    NL * NH * NW #>= Q,
-	NL * NH * NW *3 #=< Q * 5, 
-    
+    all_distinct([IL, IW, IH]),
+    element(IL, [L,H,W], RL),
+    element(IH, [L,H,W], RH),
+    element(IW, [L,H,W], RW),
+    %rotate([L, H, W], [RL, RH, RW]), 
+
+	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
+
     GL #= NL * RL + IG,
     GH #= NH * RH,
-    GW #= NW * RW, !, 
-    group_products(Ps, MaxHs, TopGap, Vs, Tasks, GPsTail, DPs), !.
+    GW #= NW * RW,
+
+    GL + IG + LG #=< SL ,
+   	GH + TopGap #=< MaxH,
+	GW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
+
+    NL * NH * NW #>= Q,
+	(NL * NH * NW) * 31 #=< Q * 50, !, 
+    group_products(Ps, MaxHs, TopGap, Vs, Tasks, GPsTail, DPs).
 
 group_products([P|Ps], MaxH, TopGap, Vs, Tasks, GPs, [P|DPsTail]) :- 
     group_products(Ps, MaxH, TopGap, Vs, Tasks, GPs, DPsTail), !.
 
 
 get_machines(MaxHs, Machines) :- get_machines(MaxHs, 1, Machines).
-get_machines([], N, []).
-get_machines([MaxH|MaxHs], N, [machine(N, MaxL)|Machines]) :-
+get_machines([], _, []).
+get_machines([_MaxH|MaxHs], N, [machine(N, 1200)|Machines]) :-
     MaxL #>= 0, MaxL #=< 1200,
     N1 is N + 1,
     get_machines(MaxHs, N1, Machines).
@@ -117,7 +123,7 @@ bay_shelves_limit(MaxHs, AvalH) :- bay_shelves_limit(MaxHs, AvalH, _).
 maxH_domain(AvalH, N, MaxHs) :-
     numlist(0, 50, AvalH, _, MaxHDomain),
 	list_to_fdset(MaxHDomain, FDS_MaxHDomain),	
-    NShelves is N // 10,
+    NShelves is N,
 	length(MaxHs, NShelves),
     %sum(MaxHs, #=<, AvalH),
 	( foreach(MaxH, MaxHs),
@@ -142,7 +148,7 @@ split_chosen([P-G|GPsTail], [V|Vs], MaxHs, Bays, [(Bay, V, MaxH)-(P-G)|CPs]) :-
 	split_chosen(GPsTail, Vs, MaxHs, Bays, CPs).
 
 append_vars([], [], [], []).
-append_vars([V|Vs], [_-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], [V, GL, RL, GH, RH, GW, RW|AllVs], [GW, GH|Ls]) :-
+append_vars([V|Vs], [_-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], [GL, RL, GH, RH, GW, RW, V|AllVs], [GL, RL, GH, RH, GW, RW |Ls]) :-
 	append_vars(Vs, GPsTail, AllVs, Ls).
 
 
@@ -150,12 +156,12 @@ get_tasks_bays([], [], []).
 get_tasks_bays([MaxH|MaxHs], [task(1, 1, 2, MaxH, Bay)|TasksBays], [Bay|Bays]):-
     get_tasks_bays(MaxHs, TasksBays, Bays).
 
-get_machines_bays(AvalH, N, N, []) :- !.
-get_machines_bays(AvalH, N, MaxN, [machine(N, MaxH)|MachinesBays]) :-
-    MaxH #>= 0, MaxH #=< AvalH,
-    N < MaxN,
+get_machines_bays(AvalH, N, MaxN, [machine(N, AvalH)|MachinesBays]) :-
+    N =< MaxN, !,
+    %MaxH #>= 0, MaxH #=< AvalH,
     N1 is N + 1,
     get_machines_bays(AvalH, N1, MaxN, MachinesBays).
+get_machines_bays(_AvalH, N, _N, []) :- !.
 
 
 bosh_labeling(Shelves, TimeOut, Vars, NBays, ShelvesV) :-
@@ -187,12 +193,12 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
     maxH_domain(MaxSH, Size, MaxHs),
     get_machines(MaxHs, 1, Machines),
     group_products(F, MaxHs, TopGap, Vs, Tasks, GPs, DPs1),
-    cumulatives(Tasks, Machines, [bound(upper), task_intervals(true)]),
+    cumulatives(Tasks, Machines, [bound(upper), generalization(true), task_intervals(true)]),
 
     get_tasks_bays(MaxHs, TasksBays, Bays),
-    get_machines_bays(AvalH, 1, 60, MachinesBays),
-    domain(Bays, 1, 60),
-    cumulatives(TasksBays, MachinesBays, [bound(upper)]),
+    get_machines_bays(AvalH, 1, Size, MachinesBays),
+    domain(Bays, 1, Size),
+    cumulatives(TasksBays, MachinesBays, [bound(upper), generalization(true), task_intervals(true)]),
 
     %same_length(F, Vs),
     domain(Vs, 1, Size),
@@ -204,27 +210,40 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
 
 
     append_vars(Vs, GPs, Vs1, Ls),
-	append(Bays, MaxHs, Vs2),
-	append(Vs1, Vs2, Vs3),
+
+%	append(Ls, Vs, Vs2),
+%	append(Vs2, MaxHs, Vs3),
+%	append( Vs3, Bays, Vs4),
+
+	append( Ls, Vs ,Vs2),
+	append(Vs2, MaxHs , Vs3),
+	append( Vs3, Bays, Vs4),
+
 	%append(Vs2, MaxHs, Vs3),
 %	append(Vs3, [], Vars),
-	append(Vs3, [Shelves, NBays], Vars),
+    %reverse(Vs3, Vars),
+	%append(Vs4, [NBays], Vars),
    % print(Vars),
 
 %	labeling([minimize(MaxH), time_out(3000, _Flag)], Vars),
     
     %Bays in 1..Size,
-    sum(MaxHs, #=, Shelves),    
+    
+    %Shelves in 0..100000,
+   
+   % sum(MaxHs, #=, Shelves),    
+    
     %Bays * 10 #>= ShelvesV, 
     %(Bays-1) * 10 #=< ShelvesV, 
-    maximum(ShelvesV, Vs),   
+    
+    %maximum(ShelvesV, Vs),   
            
     %indomain(Bays),
     %print(Bays),
 	%labeling([], Vs2),
 	%findall(Bays, labeling([minimize(Bays), time_out(60000, _Flag), all],  Vars), AllBays),
     !,
-    NBays #= 7, 
+    %NBays #= 7, 
     maximum(NBays, Bays),
     
 /*    findall(X, between(1,60, X),Is),
@@ -236,9 +255,12 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
     %TimeOut is  Size*100,!,
     %NBays #> 1 #<=> NBayOne, 
     %Cost #= NBays*3050 + Shelves,
-    Cost * 50 #= Shelves,
-    labeling([minimize(Cost), time_out(60000, _Flag), all],  Vars),
-    print(Vs),
+    %Cost * 50 #= Shelves,
+    Cost  #= NBays,
+    %labeling([minimize(Shelves), time_out(600000, _Flag), all],  Vs4),
+    %nl, print([Shelves,MaxHs]), nl, !, 
+    labeling([minimize(Cost), time_out(600000, _Flag),impact, all],  Vs4),
+    print(Vs),nl,
 	%findall([NBays, Shelves, ShelvesV], bosh_labeling(Shelves, TimeOut, Vars, NBays, ShelvesV), AllRes),
     %print([Bays, AllBays, ShelvesV, Shelves])    , !,
     %bosh([[]|Fs], AvalH, N, CPsTail, DPs).
@@ -261,9 +283,11 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
 
 
 %    print(AllRes), nl, 
-
+/*
 	length(CPs, L1),
-	%length(RPs, L2),
+	
+    
+    %length(RPs, L2),
 	%print([L1, CPs, L2]), nl, 
     
     ( L1 > 0, !; false ),
@@ -273,7 +297,7 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
 	N1 is N + NBays,
 	( bosh([DPs1|Fs], AvalH, N1, CPsTail, DPs2), DPs = DPs2; 
       DPs = F1, nl, nl, write(['\'Family shelve not complete, dropped pr oducts: \'', DPs]), nl, nl).
-
+*/
 go(NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
@@ -281,6 +305,7 @@ go(NI, N, FsFull) :-
     length(Fs, N), append(Fs,_, Ts),
     !, fd_statistics, reset_timer, 
     %bosh(Fs, Res), 
+    %reverse(Fs,FsR),
     findall(Res, bosh(Fs, Res), ResAll),
     print_time('Time: '),
     fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, _CPs,DPs]), fd_statistics.%, statistics.
