@@ -62,7 +62,7 @@ rotate([L, H, W], [RL, RH, RW]) :-
 % group_product(+Product, +MaxH, -GroupedProduct)
 group_products([], _, _, [], [], [], []) :- !.
 group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
-        [V|Vs], [task(1,1,2,GL,V)|Tasks], 
+        [V|Vs], [task(V,1,_,GL,1)|Tasks], 
         [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], DPs) :-
     
     element(V, MaxHs, MaxH),
@@ -153,7 +153,7 @@ append_vars([V|Vs], [_-grouped(GL, GW, GH, RL, RW, RH)|GPsTail], [GL, RL, GH, RH
 
 
 get_tasks_bays([], [], []).
-get_tasks_bays([MaxH|MaxHs], [task(1, 1, 2, MaxH, Bay)|TasksBays], [Bay|Bays]):-
+get_tasks_bays([MaxH|MaxHs], [task(Bay, 1, _, MaxH, 1)|TasksBays], [Bay|Bays]):-
     get_tasks_bays(MaxHs, TasksBays, Bays).
 
 get_machines_bays(AvalH, N, MaxN, [machine(N, AvalH)|MachinesBays]) :-
@@ -162,6 +162,18 @@ get_machines_bays(AvalH, N, MaxN, [machine(N, AvalH)|MachinesBays]) :-
     N1 is N + 1,
     get_machines_bays(AvalH, N1, MaxN, MachinesBays).
 get_machines_bays(_AvalH, N, _N, []) :- !.
+
+
+first_shelves(Bays, MaxHs, NBays) :-
+    same_length(Fs, Bays),
+    ( foreach(Bay, Bays),
+      foreach(F, Fs),
+      param(MaxHs) do 
+      element(Bay, MaxHs, MaxH),
+      MaxH #>= 650 #<=> B,
+      F #= B * Bay
+    ),
+    nvalue(NBays, Fs). 
 
 
 bosh_labeling(Shelves, TimeOut, Vars, NBays, NShelves) :-
@@ -190,20 +202,22 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
 	%; TopGap is THICK + TG), % top gap 40+15
 	TopGap is THICK + TG, % top gap 40+15
 
-    maxH_domain(MaxSH, Size, MaxHs),
-    get_machines(MaxHs, 1, Machines),
+    maxH_domain(MaxSH, 100, MaxHs),
+ %   get_machines(MaxHs, 1, Machines),
     group_products(F, MaxHs, TopGap, Vs, Tasks, GPs, DPs1),
     %cumulatives(Tasks, Machines, [bound(upper), generalization(true), task_intervals(true)]),
-    cumulatives(Tasks, Machines, [bound(upper)]),
+    XXX1200 in 0..1200,
+    cumulative(Tasks, [limit(XXX1200), global(true)]),
 
     get_tasks_bays(MaxHs, TasksBays, Bays),
-    get_machines_bays(AvalH, 1, 50, MachinesBays),
+%    get_machines_bays(AvalH, 1, 50, MachinesBays),
     domain(Bays, 1, 50),
     %cumulatives(TasksBays, MachinesBays, [bound(upper), generalization(true), task_intervals(true)]),
-    cumulatives(TasksBays, MachinesBays, [bound(upper)]),
+    XXXBay3050 in 0..3050,
+    cumulative(TasksBays, [limit(XXXBay3050), global(true)]),
 
     %same_length(F, Vs),
-    domain(Vs, 1, Size),
+    domain(Vs, 1, 100),
     
 %    chosen_constraints(GPs, Vs, Cs, FilledSum),
 
@@ -247,7 +261,8 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
     !,
     %NBays #= 7, 
     maximum(NBays, Bays),
-    
+
+    first_shelves(Bays, MaxHs, NBays),
 /*    findall(X, between(1,60, X),Is),
     (foreach(I, Is) do
         count(I, Bays, #=, XI),
@@ -259,9 +274,9 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
     %Cost #= NBays*3050 + Shelves,
     %Cost * 50 #= Shelves,
     Cost  #= NBays,
-    %labeling([minimize(Shelves), time_out(3000, _Flag)],  Vs3),
-    %nl, print([Shelves,MaxHs]), nl, !, 
-    labeling([minimize(Cost), time_out(300000, _Flag), bisect, all],  Vs4),
+    %labeling([minimize(Shelves), time_out(10000, _Flag), bisect],  Vs3),
+    %nl, print([Shelves,MaxHs, TasksBays]), nl, !, 
+    labeling([minimize(Cost), time_out(60000, _Flag), all],  Vs4),
     print(Vs),nl,
 	%findall([NBays, Shelves, NShelves], bosh_labeling(Shelves, TimeOut, Vars, NBays, NShelves), AllRes),
     %print([Bays, AllBays, NShelves, Shelves])    , !,
