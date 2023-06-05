@@ -53,7 +53,6 @@ shelve(40, 15, 10, 10, 10).
 
 % rotate(+ProductDimensions, -RotateProdutcDimensions)
 rotate([L, H, W], [RL, RH, RW]) :- 
-	%domain(Vs, 1, 3),
     all_distinct([IL, IW, IH]),
     element(IL, [L,H,W], RL),
     element(IH, [L,H,W], RH),
@@ -70,11 +69,7 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
     bay(SL, _, SW, _),
     shelve(_THICK, _TG, LG, IG, _RG),
 
-    all_distinct([IL, IW, IH]),
-    element(IL, [L,H,W], RL),
-    element(IH, [L,H,W], RH),
-    element(IW, [L,H,W], RW),
-    %rotate([L, H, W], [RL, RH, RW]), 
+    rotate([L, H, W], [RL, RH, RW]), 
 
 	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
 
@@ -225,15 +220,16 @@ bosh([F|Fs], AvalH, N, CPs, DPs) :-
 %	bosh-knapsack(Cs, GPs, MaxL),
 
 
-    append_vars(Vs, GPs, Vs2, Ls),
+    append_vars(Vs, GPs, Gs, Ls),
+
+
+	%append( Ls, Vs ,Vs2),
+	append(Gs, MaxHs , Vs3),
+	append( Vs3, Bays, Vs4),
 
 %	append(Ls, Vs, Vs2),
 %	append(Vs2, MaxHs, Vs3),
 %	append( Vs3, Bays, Vs4),
-
-	%append( Ls, Vs ,Vs2),
-	append(Vs2, MaxHs , Vs3),
-	append( Vs3, Bays, Vs4),
 
 	%append(Vs2, MaxHs, Vs3),
 %	append(Vs3, [], Vars),
