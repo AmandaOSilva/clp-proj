@@ -55,30 +55,12 @@ process_bays([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) 
     append(['"k"', '"grey"', '"grey"'], Colors1, Colors),
     process_bays(CPs, PsTail, SizesTail, ColorsTail).
 
+
+go_export(N) :-
+    go_export([3, 1], N).
 go_export([VarsSelectionOption, LabelingOption], N) :-
     goVis([VarsSelectionOption, LabelingOption], N,res(CPs, _DPs)), !,
     group(same_bay, CPs, CPsByBay),
     process_bays(CPsByBay, Ps, Sizes, Colors),
     Res = [Ps, Sizes, Colors],
     write_matrix_in_file('../visualizer/output/bosh_result.py', 'RES', Res).
-
-
-%-------------------------------------------------------------------------
-%  Unit tests
-%-------------------------------------------------------------------------
-/*
-:- use_module(library(plunit)).
-
-:- begin_tests(visu).
-
-test(shelved-product-position0) :-
-    shelved-product-position(0, 0, grouped(70, 60, 30, 10, 20, 30), (0,0,0)). 
-
-test(shelved-product-position0) :-
-    shelved-product-position(0, 0, grouped(70, 60, 30, 10, 20, 30), (20,20,30)). 
-
-test(shelved-product-position-all) :-
-    findall(Pos, shelved-product-position(0, 0, grouped(40, 40, 30, 10, 20, 30), Pos), _AllPos). 
-
-:- end_tests(visu). 
-*/   

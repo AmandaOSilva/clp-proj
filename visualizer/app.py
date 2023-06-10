@@ -2,14 +2,13 @@ import tkinter
 
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
-# Implement the default Matplotlib key bindings.
+
 from matplotlib.backend_bases import key_press_handler
-from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 import matplotlib.pyplot as plt
+
 from output.bosh_result import *
-import matplotlib as mpl
 
 
 def cuboid_data2(o, size=(1, 1, 1)):
@@ -40,18 +39,18 @@ def update(canvas, fig, i):
     # if i>9:
     #     break;
     # sub = 111+i*10+i
-    ax[i] = fig.add_subplot(1, 1, 1, projection='3d')
-    ax[i].set_box_aspect([1200, 650, 2400])
+    ax = fig.add_subplot(1, 1, 1, projection='3d')
+    ax.set_box_aspect([1200, 650, 2400])
     # ax.set_box_aspect([1, 1, 1])
     # ax = fig.gca(projection='3d')
     # ax.set_aspect('auto')
 
     pc = plotCubeAt2(positions[i], sizes[i], colors=colors[i], edgecolor="k")
-    ax[i].add_collection3d(pc)
+    ax.add_collection3d(pc)
 
-    ax[i].set_xlim([-20, sx + 20])
-    ax[i].set_ylim([0, sy])
-    ax[i].set_zlim([0, sz])
+    ax.set_xlim([-20, sx + 20])
+    ax.set_ylim([0, sy])
+    ax.set_zlim([0, sz])
 
     # canvas.clf()
     canvas.draw()
@@ -79,7 +78,7 @@ positions = RES[0]  # [0:max_res]
 sizes = RES[1]
 colors = RES[2]
 
-ax = {}
+#ax = {}
 # pc = []
 fig = plt.figure()
 canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
@@ -98,7 +97,7 @@ button_quit = tkinter.Button(master=root, text="Quit", command=root.destroy)
 
 
 def updateFig(newVal):
-    update(canvas, fig, int(newVal)-1)
+    update(canvas, fig, int(newVal) - 1)
 
 
 slider_update = tkinter.Scale(root, from_=1, to=len(positions), orient=tkinter.HORIZONTAL,

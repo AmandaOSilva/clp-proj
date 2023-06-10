@@ -155,7 +155,7 @@ labeling_options(36, [ffc, bisect, down]).
 bosh_labeling(OptNumber, Vars, Cost) :-
     labeling_options(OptNumber, Opt),
     append(Vars, [Cost], VarsAll),
-	labeling([minimize(Cost), time_out(30000, _Flag)|Opt], VarsAll).
+	labeling([minimize(Cost), time_out(6000, _Flag)|Opt], VarsAll).
 
 
 
@@ -171,7 +171,7 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
     length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, Bay, Size]), nl,
     bay(MaxSL, _, _, MaxSH),
     shelf(THICK, TG, LG, _IG, _RG),
-    (AvalH = 3000 ->
+    (AvalH = MaxSH ->
 	  TopGap is TG % no shelve yet
 	; TopGap is THICK + TG), % top gap 40+15
 
@@ -179,17 +179,18 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
     group_products(F, MaxH, TopGap, Gs, GPs, DPs1),
 
     chosen_constraints(Gs, AntiCs, Cs, MaxL),
-    RemainL #>= 0,
-	RemainL #= MaxSL - LG - MaxL, 
     domain(AntiCs, 1, 2),
 
     vars_order(VarsSelectionOption, Cs, Gs, MaxH, AntiCs, Vars),
 
-    %Cost #= MaxH + (1-CsMax)* 1000000,
-    Cost #= MaxH + RemainL,
-    %Cost #= MaxH,
+    MaxL #=< MaxSL - LG, 
+%    RemainL #>= 0,
+%	RemainL #= MaxSL - LG - MaxL, 
+
+    %Cost #= MaxH + MaxSL - LG - MaxL,
+    Cost #= MaxH,
     bosh_labeling(LabelingOption, Vars, Cost),
-    %print([RemainL, Cost, MaxH]),
+    %print([MaxL, Cost, MaxH]),
 	split_chosen(GPs, Cs, CPs, RPs),
 	length(CPs, L1),
     ( L1 > 0, !; false ),
@@ -224,15 +225,14 @@ go :- go([3,1]).
 
 go_all_options(N) :-
     families_sorted(Fs),
-    %nth1(N, Fs, F),
     %( foreach(VarsSelectionOption, [1,2]),
-    ( foreach(VarsSelectionOption, [1]),
+    ( foreach(VarsSelectionOption, [3]),
       foreach(R1s, Rs),
       param(N, Fs) do
-%      ( foreach(LabelingOption, [6]),
+      ( foreach(LabelingOption, [1,5]),
 %      ( foreach(LabelingOption, [1,2,3,4,5,6]),
 %      ( foreach(LabelingOption, [31,32,33,34,35,36]),
-      ( foreach(LabelingOption, [1,2,3,4,5,6,11,12,13,14,15,16,21,22,23,24,25,26,31,32,33,34,35,36]),
+%      ( foreach(LabelingOption, [1,2,3,4,5,6,11,12,13,14,15,16,21,22,23,24,25,26,31,32,33,34,35,36]),
         foreach(R, R1s),
         param(N, Fs, VarsSelectionOption) do
             ( catch(go_all_options([VarsSelectionOption, LabelingOption], N, 1, Fs, Time, NBay),
@@ -249,17 +249,17 @@ go_all_options([VarsSelectionOption, LabelingOption], NI, N, FsFull, Time, NBay)
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts), !,
-    %set_prolog_flag(gc, off),
-    %statistics, 
     reset_timer,
     bosh([VarsSelectionOption, LabelingOption], Fs, Res), !,
     get_time(Time),
-    %Res = res(CPs, UsedBays, []),
     Res = res(CPs, []),
     last(CPs, (NBay, _, _)-_).
 
 
 % families_sorted(Fs),    go_timer_stats(1, 3, Fs).
+go_timer_stats :-
+    go_timer_stats([3,5]).
+
 go_timer_stats([VarsSelectionOption, LabelingOption]) :-
     families_sorted(Fs),
     length(Fs, L),
@@ -268,10 +268,10 @@ go_timer_stats([VarsSelectionOption, LabelingOption]) :-
 go_timer_stats([VarsSelectionOption, LabelingOption], NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
-    %length(FsFull, L), LPos = L - NF, 
     length(Fs, N), append(Fs,_, Ts),
     ( foreach(F, Fs),
-      foreach(M, Ms) do
+      foreach(M, Ms),
+      param(VarsSelectionOption, LabelingOption) do
         %F = [product(N, _, _, _, _)|_],
         length(F, L),
         reset_timer,
@@ -280,10 +280,10 @@ go_timer_stats([VarsSelectionOption, LabelingOption], NI, N, FsFull) :-
         %Res = res(CPs, UsedBays, []),
         Res = res(CPs, []),
         last(CPs, (UsedBays, N, _)-_),
-        length(CPs, UsedShelves),
-        M = [N, L, T, UsedBays, UsedShelves]
+        M = [N, L, T, UsedBays]
     ),
-    write_matrix_in_file('../sicstus/output/result_stats.py', 'Ms', Ms).
+    write_matrix_in_file('../sicstus/output/result_stats.py', 'Ms', Ms),
+    write_file('../sicstus/output/result_stats.csv',  Ms).
 
 
 

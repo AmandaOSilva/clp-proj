@@ -1,4 +1,8 @@
 import itertools
+import argparse
+import sys, os
+
+PATH_DIRNAME = os.path.dirname(os.path.realpath(__file__))
 import time
 from operator import itemgetter
 from itertools import groupby
@@ -22,7 +26,7 @@ BAY_AVAL_HEIGHT = 3000
 
 
 # prodDim = [l, w, h]
-def rotate(model, prodDim, i):  # TODO: permutation ???
+def rotate(model, prodDim, i):
     # print(prodDim)
     indexes = model.integer_var_list(3, 0, 2, f"indices_{i}")
     rotated = model.integer_var_list(3, name=f"rotated_{i}", domain=prodDim)
@@ -32,35 +36,36 @@ def rotate(model, prodDim, i):  # TODO: permutation ???
     return rotated
 
 
-def group_products(model, products, chosen, maxH, avalHeight, topGap):
+def group_products(model, products, maxH, avalHeight, topGap):
     groupedProds = []
     dropProds = []
     for i in range(len(products)):
         product = [_, q, l, w, h] = products[i]
-        # if min(product[2:]) > avalHeight - topGap or (
-        #         q* l * w * h > (avalHeight - topGap) * BAY_DEPTH * (BAY_WIDTH - SHELVE_INTER_GAP - SHELVE_LEFT_GAP)):
-        #     # print("droped: ", product, avalHeight, q*l*w*h, (avalHeight-topGap)*BAY_DEPTH*(BAY_WIDTH-SHELVE_INTER_GAP - SHELVE_LEFT_GAP))
-        #     dropProds.append(product)
-        # else:
-        groupedProds.append(group_product(model, product, chosen, i, maxH, topGap))
+        if min(product[2:]) > avalHeight - topGap or (
+                q * l * h > (avalHeight - topGap) * (BAY_WIDTH - SHELVE_INTER_GAP - SHELVE_LEFT_GAP)):
+            # print("droped: ", product, avalHeight, q*l*w*h, (avalHeight-topGap)*BAY_DEPTH*(BAY_WIDTH-SHELVE_INTER_GAP - SHELVE_LEFT_GAP))
+            dropProds.append(product)
+        else:
+            groupedProds.append(group_product(model, product, i, maxH, topGap))
 
     return groupedProds, dropProds
 
 
-def group_product(model, product, chosen, i, maxH, topGap):
+def group_product(model, product, i, maxH, topGap):
     [_, q, l, w, h] = product
     # print(q, l, w, h)
     [nL, nH, nW] = model.integer_var_list(3, 1, q, f"numberProds{i}")
     [rL, rH, rW] = rotate(model, [l, w, h], i)
 
     model.add(nL * rL + SHELVE_INTER_GAP + SHELVE_LEFT_GAP <= BAY_WIDTH)
-    model.add(chosen[i] * nH * rH + topGap <= maxH)
+    model.add(nH * rH + topGap <= maxH)
 
     model.add(nW * rW <= BAY_DEPTH)
     model.add((((nW + 1) * rW > BAY_DEPTH) | ((nH == 1) & (nL == 1) & (nW == q))))
 
+    # model.add((nL * nH * nW == q) | ((nL * nH * nW > q) & ((nL * nH * nW) * 4 < q * 6)))
     model.add(nL * nH * nW >= q)
-    model.add((nL * nH * nW) * 3 <= q * 5)
+    model.add((nL * nH * nW) * 31 <= q * 50)
 
     maxDim = q * max([l, w, h]) + 10  # todo
     minDim = min([l, w, h])  # todo
@@ -70,6 +75,7 @@ def group_product(model, product, chosen, i, maxH, topGap):
     model.add(gL == nL * rL + SHELVE_INTER_GAP)
     model.add(gH == nH * rH)
     model.add(gW == nW * rW)
+#    return [gL,  gW, gH, rL, rW, rH]#, nL, nH, nW]
     return [gL, gH, gW, rL, rH, rW]
 
 
@@ -77,7 +83,7 @@ def group_product(model, product, chosen, i, maxH, topGap):
 
 
 def getMaxH(model, avalHeight):
-    minHDomain = SPACE_BETWEEN_SHELVES * 2
+    minHDomain = SPACE_BETWEEN_SHELVES
     if avalHeight == BAY_AVAL_HEIGHT:
         minHDomain = BAY_AVAL_HEIGHT - BAY_HEIGHT
     return model.integer_var(name="maxH", domain=range(minHDomain, avalHeight + 1, SPACE_BETWEEN_SHELVES))
@@ -90,7 +96,7 @@ def splitChosen(solution, products, groupedProds, dropProds, chosen):
     chosenProducts = []
     remainProducts = dropProds
     for i in range(len(chosen)):
-        if solution.get_value(chosen[i]):
+        if 1- solution.get_value(chosen[i]):
             chosenProducts.append([solution.get_value(v) for v in groupedProds[i]] + products[i][1:2])
         else:
             remainProducts.append(products[i])
@@ -108,25 +114,26 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
         topGap = SHELVE_THICKNESS + SHELVE_TOP_GAP
     maxH = getMaxH(model, avalHeight)
 
-    chosen = model.binary_var_list(size, "chosen")
-    groupedProds, dropProds = group_products(model, products, chosen, maxH, avalHeight, topGap)
+    groupedProds, dropProds = group_products(model, products, maxH, avalHeight, topGap)
     groupedSize = len(groupedProds)
-    if not groupedProds and dropProds:
-        return next_bay(model, avalHeight, bayNumber, [], products, dropProds)
 
-    remainL = model.integer_var(0, BAY_WIDTH - SHELVE_LEFT_GAP - 1)
+    if not groupedProds and dropProds:
+        return next_bay(model, avalHeight, bayNumber, [], products, shelvedProducts, dropProds)
+
+    remainL = model.integer_var(0, BAY_WIDTH - SHELVE_LEFT_GAP)
     maxL = (BAY_WIDTH - SHELVE_LEFT_GAP) - remainL
 
-    model.add(model.scal_prod([gL for [gL, _, _, _, _, _] in groupedProds], chosen) == maxL)
+    chosen = model.binary_var_list(groupedSize, "chosen")
+    # model.add(model.scal_prod([gL for [gL, _, _, _, _, _] in groupedProds], chosen) == maxL)
     #   model.add(model.scal_prod([gL for [_, _, _, _,_, gL] in groupedProds], chosen) == maxL)
-    # model.add(sum([groupedProds[i][-1] * chosen[i] for i in range(groupedSize)]) == maxL)
+    model.add(model.sum([groupedProds[i][0] * (1- chosen[i]) for i in range(groupedSize)]) == maxL)
 
     # objective = model.count_different(baysIds)
     # objective = model.sum(maxHs) #+ model.count_different(baysIds )*10
     # objective = model.max(baysIds)
     # model.maximize(maxL-maxH*10)
     # model.minimize(maxH)
-    model.minimize(maxH + remainL * 10)
+    model.minimize(maxH + remainL)# + (model.max(chosen)-1)*10000000)
     # vs = model.integer_var_list(size, 1, 2, "vs")
     # for i in range(size):
     #     model.add((vs[i] == 1) - (chosen[i] == 1) != 0)
@@ -134,19 +141,19 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
     #  for g in groupedProds:
     #      model.add(model.search_phase(g))
 
-    # vars_search = list(itertools.chain(*[[chosen[i]] + groupedProds[i][::-1] for i in range(groupedSize)]))
-
-    # vars_search = list(itertools.chain(*[groupedProds[i] + [chosen[i]] for i in range(groupedSize)]))[::-1]
-
-    # #print([x.name for x in vars_search])
-    # model.add(model.search_phase(vars_search))
-    # model.add(model.search_phase(chosen))
-
+    # vars_search = list(itertools.chain(*[ [chosen[i]] + groupedProds[i][::-1] for i in range(groupedSize)]))
+    # #
+    # # #vars_search = list(itertools.chain(*[groupedProds[i] + [chosen[i]] for i in range(groupedSize)]))
+    # #
+    # # # #print([x.name for x in vars_search])
+    # # # model.add(model.search_phase(vars_search))
+    # # # model.add(model.search_phase(chosen))
+    # #
     # model.add(model.search_phase(vars=vars_search, varchooser=model.select_smallest(model.var_index(vars_search)),
     #                              valuechooser=model.select_smallest(model.value())))
+    # model.add(model.search_phase([remainL, maxH]))
 
     # vars_search = chosen+ list(itertools.chain(*groupedProds))
-    # model.add(model.search_phase([maxH]))
     # model.add(model.search_phase(vars=vars_search, varchooser=model.select_smallest(model.var_index(chosen)),
     #                              valuechooser=model.select_largest(model.value())))
     # model.search_phase(vars=chosen, varchooser=model.select_largest(model.var_index(chosen)),
@@ -157,8 +164,8 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
     # model.add(model.minimize(nonZero))
 
     # starting_point = model.create_empty_solution()
-    #
-    # for c in chosen[:len(chosen) // 2][::-1]:
+    # # #
+    # for c in chosen:  # [:len(chosen) // 2]:#[::-1]:
     #     starting_point.add_integer_var_solution(c, 1)
     # # starting_point.add_integer_var_solution(maxL, 1190)
     # # for e in e2[:(len(e2))]:
@@ -166,7 +173,7 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
     #
     # model.set_starting_point(starting_point)
     # print(model.refine_conflict())
-    solution = model.solve(LogVerbosity='Quiet', SearchType='Auto', Workers=16, TimeLimit=120)
+    solution = model.solve(LogVerbosity='Quiet', SearchType='Auto', Workers=8, TimeLimit=60)
     # solutions = model.start_search(SearchType='DepthFirst', Workers=1, LogVerbosity='Terse', TimeLimit=120)
     # 'DepthFirst', 'Restart', 'MultiPoint', 'IterativeDiving', 'Neighborhood', 'Auto')
     # solutions = model.start_search(TemporalRelaxation="Off", LogVerbosity='Terse', SearchType='Auto', Workers=8,
@@ -189,13 +196,14 @@ def bosh_family(products, bayNumber, shelvedProducts, avalHeight):
         else:
             newAvalHeight = avalHeight - solution.get_value(maxH)
             newBayNumber = bayNumber
+            shelvedProducts.append([bayNumber, products[0][0], newAvalHeight, chosenProducts])
             if newAvalHeight < topGap + SPACE_BETWEEN_SHELVES:
                 newAvalHeight = BAY_AVAL_HEIGHT
                 newBayNumber = bayNumber + 1
+
             model = None
 
             # [(N, NF, ShelveH) - CPs | CPsTail]
-            shelvedProducts.append([bayNumber, products[0][0], newAvalHeight, chosenProducts])
             return bosh_family(remainProducts, newBayNumber, shelvedProducts, newAvalHeight)
     else:
         print(status)
@@ -279,8 +287,9 @@ def process_products(oH, oL, products):
 
         lista = [(l, w, h) for l in
                  range(oL, oL + gL, rL) for h in range(oH, oH + gH, rH) for w in range(0, gW, rW)]
-        # print(lista)
+        print([gL, gH, gW, rL, rH, rW, q], lista)
         positions += lista[0:q]
+        print(positions)
         sizes += [(rL, rW, rH)] * q
         colors += ["g"] * q
         oL += gL
@@ -337,46 +346,67 @@ def export(shelvedProducts):
     # print(res[0][0])
     # print(res[0][1])
     # print(res[0][2])
-    with open('../visualizer/output/bosh_result.py', 'w') as f:
+    with open(PATH_DIRNAME + '/../visualizer/output/bosh_result.py', 'w') as f:
         f.write("RES = " + str(res))
 
 
-def main():
+def main(families, mustExport):
     bayNumber = 1
     avalHeight = BAY_AVAL_HEIGHT
     stats = []
     shelvedProducts = []
     #    for products in Fs[65:67]: # [0:2]:  #
-    for products in Fs[0:2]:  #
+    for products in families:  # [1:2]:  #
         start_time = time.time()
         isOk, newBayNumber, newAvalHeight, chosenProducts, remainProducts = bosh(bayNumber, avalHeight, shelvedProducts,
-                                                                                 products)
+                                                                                 products[::-1])
         exec_time = time.time() - start_time
         stats.append([products[0][0], len(products), round(exec_time, 2), newBayNumber, len(shelvedProducts)])
         print(shelvedProducts)
         if not isOk:
             break
-        if newAvalHeight <= 50:
+        if newAvalHeight <= SPACE_BETWEEN_SHELVES:
             avalHeight = BAY_AVAL_HEIGHT
             bayNumber = newBayNumber + 1
         else:
             avalHeight = newAvalHeight
             bayNumber = newBayNumber
-    export(shelvedProducts)
+    if mustExport:
+        export(shelvedProducts)
     print(stats)
 
-    with open('output/bosh_result_docplex.py', 'w') as f:
+    with open(PATH_DIRNAME + '/output/bosh_result_docplex.py', 'w') as f:
         f.write("MsDocPlex = " + str(stats))
 
     # print(bayNumber, remainProducts)
 
 
 if __name__ == '__main__':
-    main()
+    sys.argv
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-a", "--all", required=False, action='store_true',
+                    help="shelve all families products")
+    ap.add_argument("-f", "--family", required=False,
+                    help="shelve family number (1-67)")
+    ap.add_argument("-e", "--export", required=False, action='store_true',
+                    help="export results for visualization")
+    args = ap.parse_args()
+
+    if args.family:
+        try:
+            family = int(args.family)
+        except:
+            ap.print_usage()
+            exit()
+        main([Fs[family - 1]], args.export)
+    elif args.all:
+        main(Fs, args.export)
+    else:
+        ap.print_usage()
+        exit()
 
     # export([[1, 1, 2400, [[730, 449, 466, 360, 449, 233, 3]]],
-    #         [1, 1, 2000, [[312, 200, 640, 302, 200, 320, 2], [217, 300, 290, 207, 300, 145, 2]]],
+    #         [1, 1, 2000, [[   312, 200, 640, 302, 200, 320, 2], [217, 300, 290, 207, 300, 145, 2]]],
     #         [2, 1, 2400, [[730, 449, 466, 360, 449, 233, 3]]], ])
-
 
 #  x = [[[1, 1, 2400, [[730, 449, 466, 360, 449, 233, 3]]], [1, 1, 2300, [[312, 20, 640, 302, 20, 320, 2], [217, 30, 290, 207, 30, 145, 2]]]], [[2, 1, 2400, [[730, 449, 466, 360, 449, 233, 3]]]]]
