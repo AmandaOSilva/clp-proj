@@ -1,7 +1,3 @@
-
-%print_time(Res), 
-
-
 shelved_product_position(OH, OL, grouped(GL, GW, GH, RL, RW, RH), (PL,PW, PH)) :-
     QL is (GL-10) // RL - 1, QW is GW // RW - 1, QH is GH // RH - 1, 
     NL in 0.. QL, NH in 0.. QH, NW in 0.. QW, 

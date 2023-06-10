@@ -4,6 +4,9 @@ weaving_vars([], [], [], []).
 weaving_vars([V|Vs],[_-grouped(GL, GW, GH, RL, RW, RH)|GPs], [GL, RL, GH, RH, GW, RW, V|WeavingVars], [GL, RL, GH, RH, GW, RW |Ls]) :-
 	weaving_vars(Vs, GPs, WeavingVars, Ls).
 
+weaving_vars([], [], []). 
+weaving_vars([C|Cs], [GL, GW, GH|Gs], [GL, GW, GH, C|AllVs]) :-
+	weaving_vars(Cs, Gs, AllVs).
 
 paper_vars_orders(1, Cs, Gs, MaxH, _AntiCs, Vars) :-
     append(Gs, Cs, Vs1),
@@ -19,15 +22,14 @@ paper_vars_orders(3, _Cs, Gs, MaxH, AntiCs, Vars) :-
 	append(Vs1, [MaxH], Vars).
 
 
-
-
-cumulative_vars_orders(1, Vs, _Gs, MaxHs, Bays, Ls, Vars) :-
+cumulative_vars_orders(1, Vs, GPs, MaxHs, Bays, Vars) :-
+    weaving_vars(Vs, GPs, Gs, Ls),
 	append(Ls, Vs, Vs2),
 	append(Vs2, MaxHs, Vs3),
 	append(Vs3, Bays, Vars).
 
 % weaving 
-cumulative_vars_orders(2, _Vs, Gs, MaxHs, Bays, _Ls, Vars) :-
+cumulative_vars_orders(2, _Vs, Gs, MaxHs, Bays, Vars) :-
 	append(Gs, MaxHs, Vs3),
 	append(Vs3, Bays, Vars).
 

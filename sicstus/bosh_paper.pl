@@ -94,10 +94,6 @@ split_chosen([P-_|GPsTail], [0|Cs], CPs, [P|RPs]) :-
 split_chosen([P-G|GPsTail], [1|Cs], [P-G|CPs], RPs) :-
 	split_chosen(GPsTail, Cs, CPs, RPs).
 
-weaving_vars([], [], []). 
-weaving_vars([C|Cs], [GL, GW, GH|Gs], [GL, GW, GH, C|AllVs]) :-
-	weaving_vars(Cs, Gs, AllVs).
-
 
 % return the domain of possible height  of shelves
 % {50,100,150 ... 3000} or {}

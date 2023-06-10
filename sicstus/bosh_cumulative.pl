@@ -86,6 +86,7 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
 	(NL * NH * NW) * 31 #=< Q * 50,
     !, group_products(Ps, MaxHs, TopGap, Vs, Tasks, GPs).
 
+% get the doamin of shelves height (MaxHs)
 maxH_domain(AvalH, NShelves, MaxHs) :-
     % 100 = minimal space between shelves
     % 50 = inteval between shelves heights
@@ -97,11 +98,12 @@ maxH_domain(AvalH, NShelves, MaxHs) :-
       MaxH in_set FDS_MaxHDomain
     ).
 
-split_chosen([], [], _, _, []).
-split_chosen([P-G|GPsTail], [V|Vs], MaxHs, Bays, [(Bay, V, MaxH)-(P-G)|CPs]) :-
+% shelve products, put then into shelves and shelves in to bays.
+shelve([], [], _, _, []).
+shelve([P-G|GPsTail], [V|Vs], MaxHs, Bays, [(Bay, V, MaxH)-(P-G)|CPs]) :-
     element(V, Bays, Bay),
     element(V, MaxHs, MaxH),
-	split_chosen(GPsTail, Vs, MaxHs, Bays, CPs).
+	shelve(GPsTail, Vs, MaxHs, Bays, CPs).
 
 first_shelves(Bays, MaxHs, NBays) :-
     same_length(Fs, Bays),
@@ -117,6 +119,7 @@ first_shelves(Bays, MaxHs, NBays) :-
 get_tasks_bays([], [], []).
 get_tasks_bays([MaxH|MaxHs], [task(Bay, 1, _, MaxH, 1)|TasksBays], [Bay|Bays]):-
     get_tasks_bays(MaxHs, TasksBays, Bays).
+
 
 
 bosh(SearchOptions, Fs, res(CPs, NBay)) :-
@@ -138,7 +141,7 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
 	
     % in this approach, top gap allways be the same;max avaliable height (MaxSH) one "degree" above (3050 in this case) 
     TopGap is THICK + TG, 
-
+    
     maxH_domain(AvalH, 100, MaxHs),
 
     group_products(F, MaxHs, TopGap, Vs, Tasks, GPs),
@@ -153,12 +156,9 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
 
     cumulative(TasksBays, [limit(MaxSH), global(true)]),
 
-    weaving_vars(Vs, GPs, Gs, Ls),
-
-    cumulative_vars_orders(VarsSelectionOption, Vs, Gs, MaxHs, Bays, Ls, Vars),
+    cumulative_vars_orders(VarsSelectionOption, Vs, GPs, MaxHs, Bays, Vars),
 
     %sum(MaxHs, #=, Shelves),    
-    %maximum(NShelves, Vs),   
     maximum(NBay, Bays),
 
     first_shelves(Bays, MaxHs, NBay),
@@ -167,7 +167,7 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
     Cost  #= NBay,
  
     bosh_labeling(LabelingOption, Vars, Cost, 3000),
-    split_chosen(GPs, Vs, MaxHs, Bays, CPs).
+    shelve(GPs, Vs, MaxHs, Bays, CPs).
 
 go(SearchOptions, NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
