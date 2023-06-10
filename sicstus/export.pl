@@ -1,6 +1,3 @@
-:- consult('bosh_paper.pl').
-
-
 
 %print_time(Res), 
 goVis([VarsSelectionOption, LabelingOption], N, Res) :-  

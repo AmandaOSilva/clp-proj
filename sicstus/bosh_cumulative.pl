@@ -2,6 +2,8 @@
 :- use_module(library(lists)).
 :- use_module(library(between)).
 :- consult('process_files.pl').
+:- consult('bosh_labeling.pl').
+:- consult('export.pl').
 
 /*
 For each product in turn:
@@ -120,54 +122,10 @@ first_shelves(Bays, MaxHs, NBays) :-
     ),
     nvalue(NBays, Fs). 
 
-
-vars_order(1, Vs, _Gs, MaxHs, Bays, Ls, Vars) :-
-	append(Ls, Vs, Vs2),
-	append(Vs2, MaxHs, Vs3),
-	append(Vs3, Bays, Vars).
-
-% weaving 
-vars_order(2, _Vs, Gs, MaxHs, Bays, _Ls, Vars) :-
-	append(Gs, MaxHs, Vs3),
-	append(Vs3, Bays, Vars).
-
 get_tasks_bays([], [], []).
 get_tasks_bays([MaxH|MaxHs], [task(Bay, 1, _, MaxH, 1)|TasksBays], [Bay|Bays]):-
     get_tasks_bays(MaxHs, TasksBays, Bays).
 
-
-labeling_options(1, []).
-labeling_options(2, [down]).
-labeling_options(3, [enum]).
-labeling_options(4, [enum, down]).
-labeling_options(5, [bisect]).
-labeling_options(6, [bisect, down]).
-
-labeling_options(11, [ff]).
-labeling_options(12, [ff, down]).
-labeling_options(13, [ff, enum]).
-labeling_options(14, [ff, enum, down]).
-labeling_options(15, [ff, bisect]).
-labeling_options(16, [ff, bisect, down]).
-
-labeling_options(21, [impact]).
-labeling_options(22, [impact, down]).
-labeling_options(23, [impact, enum]).
-labeling_options(24, [impact, enum, down]).
-labeling_options(25, [impact, bisect]).
-labeling_options(26, [impact, bisect, down]).
-
-labeling_options(31, [ffc]).
-labeling_options(32, [ffc, down]).
-labeling_options(33, [ffc, enum]).
-labeling_options(34, [ffc, enum, down]).
-labeling_options(35, [ffc, bisect]).
-labeling_options(36, [ffc, bisect, down]).
-
-bosh_labeling(OptNumber, Vars, Cost) :-
-    labeling_options(OptNumber, Opt),
-    append(Vars, [Cost], VarsAll),
-	labeling([minimize(Cost), time_out(10000, _Flag), all|Opt], VarsAll).
 
 bosh([VarsSelectionOption, LabelingOption], Fs, res(CPs, NBay)) :-
     max_available_height(AvalH),
@@ -203,7 +161,7 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
 
     weaving_vars(Vs, GPs, Gs, Ls),
 
-    vars_order(VarsSelectionOption, Vs, Gs, MaxHs, Bays, Ls, Vars),
+    cumulative_vars_orders(VarsSelectionOption, Vs, Gs, MaxHs, Bays, Ls, Vars),
 
     %sum(MaxHs, #=, Shelves),    
     %maximum(NShelves, Vs),   
@@ -215,7 +173,7 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
     Cost  #= NBay,
     %labeling([],  Vars),
  
-    bosh_labeling(LabelingOption, Vars, Cost),
+    bosh_labeling(LabelingOption, Vars, Cost, 3000),
 
     %print_time([NF, NBay, Shelves]),
     %print(MaxHs), print(Bays),

@@ -2,6 +2,8 @@
 :- use_module(library(lists)).
 :- use_module(library(between)).
 :- consult('process_files.pl').
+:- consult('bosh_labeling.pl').
+:- consult('export.pl').
 
 /*
 For each product in turn:
@@ -110,52 +112,7 @@ weaving_vars([C|Cs], [GL, GW, GH|Gs], [GL, GW, GH, C|AllVs]) :-
 	weaving_vars(Cs, Gs, AllVs).
 
 
-vars_order(1, Cs, Gs, MaxH, _AntiCs, Vars) :-
-    append(Gs, Cs, Vs1),
-    append([MaxH], Vs1, Vars).
 
-vars_order(2, Cs, Gs, MaxH, _AntiCs, Vars) :-
-    append(Gs, Cs, Vs1),
-    append(Vs1, [MaxH], Vars).
-
-% weaving AntiCs and Gs (BEST, with maxH as Cost funciont)
-vars_order(3, _Cs, Gs, MaxH, AntiCs, Vars) :-
-    weaving_vars(AntiCs, Gs, Vs1),
-	append(Vs1, [MaxH], Vars).
-
-
-labeling_options(1, []).
-labeling_options(2, [down]).
-labeling_options(3, [enum]).
-labeling_options(4, [enum, down]).
-labeling_options(5, [bisect]).
-labeling_options(6, [bisect, down]).
-
-labeling_options(11, [ff]).
-labeling_options(12, [ff, down]).
-labeling_options(13, [ff, enum]).
-labeling_options(14, [ff, enum, down]).
-labeling_options(15, [ff, bisect]).
-labeling_options(16, [ff, bisect, down]).
-
-labeling_options(21, [impact]).
-labeling_options(22, [impact, down]).
-labeling_options(23, [impact, enum]).
-labeling_options(24, [impact, enum, down]).
-labeling_options(25, [impact, bisect]).
-labeling_options(26, [impact, bisect, down]).
-
-labeling_options(31, [ffc]).
-labeling_options(32, [ffc, down]).
-labeling_options(33, [ffc, enum]).
-labeling_options(34, [ffc, enum, down]).
-labeling_options(35, [ffc, bisect]).
-labeling_options(36, [ffc, bisect, down]).
-
-bosh_labeling(OptNumber, Vars, Cost) :-
-    labeling_options(OptNumber, Opt),
-    append(Vars, [Cost], VarsAll),
-	labeling([minimize(Cost), time_out(6000, _Flag)|Opt], VarsAll).
 
 
 
@@ -168,7 +125,8 @@ bosh([VarsSelectionOption, LabelingOption], [[]|Fs], AvalH, Bay, CPs, DPs) :-
     bosh([VarsSelectionOption, LabelingOption], Fs, AvalH, Bay, CPs, DPs).
 
 bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :-
-    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, Bay, Size]), nl,
+    length(F, Size), F = [product(NF,_,_,_,_)|_], 
+    write([NF, AvalH, Bay, Size]), nl,
     bay(MaxSL, _, _, MaxSH),
     shelf(THICK, TG, LG, _IG, _RG),
     (AvalH = MaxSH ->
@@ -181,15 +139,13 @@ bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, Bay, [(Bay, NF, Shelv
     chosen_constraints(Gs, AntiCs, Cs, MaxL),
     domain(AntiCs, 1, 2),
 
-    vars_order(VarsSelectionOption, Cs, Gs, MaxH, AntiCs, Vars),
+    paper_vars_orders(VarsSelectionOption, Cs, Gs, MaxH, AntiCs, Vars),
 
     MaxL #=< MaxSL - LG, 
-%    RemainL #>= 0,
-%	RemainL #= MaxSL - LG - MaxL, 
 
     %Cost #= MaxH + MaxSL - LG - MaxL,
     Cost #= MaxH,
-    bosh_labeling(LabelingOption, Vars, Cost),
+    bosh_labeling(LabelingOption, Vars, Cost, 6000),
     %print([MaxL, Cost, MaxH]),
 	split_chosen(GPs, Cs, CPs, RPs),
 	length(CPs, L1),
@@ -216,11 +172,12 @@ go([VarsSelectionOption, LabelingOption], NI, N, FsFull) :-
 
 
 go([VarsSelectionOption, LabelingOption], NI, N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], NI, N, Fs).
-go([VarsSelectionOption, LabelingOption]) :-  families_sorted(Fs), length(Fs, L), go([VarsSelectionOption, LabelingOption], 1, L, Fs).
 go([VarsSelectionOption, LabelingOption], N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], N, 1, Fs).
-
+go([VarsSelectionOption, LabelingOption]) :-  families_sorted(Fs), length(Fs, L), go([VarsSelectionOption, LabelingOption], 1, L, Fs).
 go(N) :- go([3,1], N).
 go :- go([3,1]).
+
+
 
 
 go_all_options(N) :-

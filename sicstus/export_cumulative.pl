@@ -1,5 +1,3 @@
-:- consult('bosh_cumulative.pl').
-
 goVis([VarsSelectionOption, LabelingOption], N, Res) :-  
     fd_statistics, reset_timer, 
     families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
