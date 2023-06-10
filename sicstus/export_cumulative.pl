@@ -1,10 +1,3 @@
-goVis([VarsSelectionOption, LabelingOption], N, Res) :-  
-    fd_statistics, reset_timer, 
-    families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
-    bosh([VarsSelectionOption, LabelingOption], [F], Res), !, Res = res(GPs, _), 
-    nl, length(GPs, L), print([L]), fd_statistics.%, statistics.
-
-
 shelved_product_position(OH, OL, grouped(GL, GW, GH, RL, RW, RH), (PL,PW, PH)) :-
     QL is (GL-10) // RL - 1, QW is GW // RW - 1, QH is GH // RH - 1, 
     NL in 0.. QL, NH in 0.. QH, NW in 0.. QW, 
@@ -69,10 +62,16 @@ same_key(K0, [K1-V|KVs0], [V|Vs], KVs) :-
 same_key(_, KVs, [], KVs).
 
 
+go_vis(SearchOptions, N, Res) :-  
+    fd_statistics, reset_timer, 
+    families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
+    bosh(SearchOptions, [F], Res), !, Res = res(GPs, _), 
+    nl, length(GPs, L), print([L]), fd_statistics.
+
 go_export(N) :-
     go_export([3, 1], N).
-go_export([VarsSelectionOption, LabelingOption], N) :-
-    goVis([VarsSelectionOption, LabelingOption], N,res(CPs, _DPs)),
+go_export(SearchOptions, N) :-
+    go_vis(SearchOptions, N,res(CPs, _DPs)),
     samsort(by_bay_shelve, CPs, CPsSorted),
     group_pairs_by_key(CPsSorted, CPsByShelve),
     group(same_bay, CPsByShelve, CPsByBay),

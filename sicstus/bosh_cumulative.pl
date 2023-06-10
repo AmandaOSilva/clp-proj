@@ -3,7 +3,7 @@
 :- use_module(library(between)).
 :- consult('process_files.pl').
 :- consult('bosh_labeling.pl').
-:- consult('export.pl').
+:- consult('export_cumulative.pl').
 
 /*
 For each product in turn:
@@ -42,8 +42,7 @@ print_time(Msg):-
 	write('s'), nl.
 
 
-% domain
-%product(F, Q, L, H, W)
+%product(FamylyNumber, Quantity, Lenght, Height, Width)
 
 % bay(width, height, depth, available height)
 % add 50 to available height for dealing with top gap of first shelf, 
@@ -56,11 +55,11 @@ shelf(40, 15, 10, 10, 10).
 
 
 % rotate(+ProductDimensions, -RotatedProductDimensions)
-rotate([L, H, W], [RL, RH, RW]) :- 
+rotate(ProductDimensions, [RL, RH, RW]) :- 
     all_distinct([IL, IW, IH]),
-    element(IL, [L,H,W], RL),
-    element(IH, [L,H,W], RH),
-    element(IW, [L,H,W], RW).
+    element(IL, ProductDimensions, RL),
+    element(IH, ProductDimensions, RH),
+    element(IW, ProductDimensions, RW).
 
 % group_product(+Product, +MaxH, +TopGap, -Variables, -GroupedProducts)
 group_products([], _, _, [], [], []) :- !.
@@ -98,18 +97,11 @@ maxH_domain(AvalH, NShelves, MaxHs) :-
       MaxH in_set FDS_MaxHDomain
     ).
 
-
 split_chosen([], [], _, _, []).
 split_chosen([P-G|GPsTail], [V|Vs], MaxHs, Bays, [(Bay, V, MaxH)-(P-G)|CPs]) :-
     element(V, Bays, Bay),
     element(V, MaxHs, MaxH),
 	split_chosen(GPsTail, Vs, MaxHs, Bays, CPs).
-
-
-weaving_vars([], [], [], []). 
-weaving_vars([V|Vs],[_-grouped(GL, GW, GH, RL, RW, RH)|GPs], [GL, RL, GH, RH, GW, RW, V|WeavingVars], [GL, RL, GH, RH, GW, RW |Ls]) :-
-	weaving_vars(Vs, GPs, WeavingVars, Ls).
-
 
 first_shelves(Bays, MaxHs, NBays) :-
     same_length(Fs, Bays),
@@ -127,26 +119,28 @@ get_tasks_bays([MaxH|MaxHs], [task(Bay, 1, _, MaxH, 1)|TasksBays], [Bay|Bays]):-
     get_tasks_bays(MaxHs, TasksBays, Bays).
 
 
-bosh([VarsSelectionOption, LabelingOption], Fs, res(CPs, NBay)) :-
+bosh(SearchOptions, Fs, res(CPs, NBay)) :-
     max_available_height(AvalH),
-    bosh([VarsSelectionOption, LabelingOption], Fs, AvalH, CPs, NBay).
+    bosh(SearchOptions, Fs, AvalH, CPs, NBay).
 
 bosh(_, [], _, [], 0).
-bosh([VarsSelectionOption, LabelingOption], [F|Fs], AvalH, [CPs|CPsTails], NBay) :-
-    bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay1),
-    bosh([VarsSelectionOption, LabelingOption], Fs, AvalH, CPsTails, NBayTail),
+bosh(SearchOptions, [F|Fs], AvalH, [CPs|CPsTails], NBay) :-
+    bosh_family(SearchOptions, F, AvalH, CPs, NBay1),
+    bosh(SearchOptions, Fs, AvalH, CPsTails, NBayTail),
     NBay is NBay1 + NBayTail.
 
 
 bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
     nl,
-    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, AvalH, Size]), 
+    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, Size]), 
     bay(MaxSL, _, _, MaxSH),
     shelf(THICK, TG, LG, _IG, _RG),
 	
-    TopGap is THICK + TG, % in this approah, top gap allways be 40+15
+    % in this approach, top gap allways be the same;max avaliable height (MaxSH) one "degree" above (3050 in this case) 
+    TopGap is THICK + TG, 
 
     maxH_domain(AvalH, 100, MaxHs),
+
     group_products(F, MaxHs, TopGap, Vs, Tasks, GPs),
     domain(Vs, 1, 100),
 
@@ -171,51 +165,55 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
 
     %Cost * 50 #= Shelves,
     Cost  #= NBay,
-    %labeling([],  Vars),
  
     bosh_labeling(LabelingOption, Vars, Cost, 3000),
-
-    %print_time([NF, NBay, Shelves]),
-    %print(MaxHs), print(Bays),
-    
     split_chosen(GPs, Vs, MaxHs, Bays, CPs).
 
-go([VarsSelectionOption, LabelingOption], NI, N, FsFull) :- 
+go(SearchOptions, NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts), !,
     %set_prolog_flag(gc, off),
     %statistics, 
     fd_statistics, reset_timer,
-    %findall(Res, bosh([VarsSelectionOption, LabelingOption],Fs, Res), ResAll),
-    bosh([VarsSelectionOption, LabelingOption], Fs, Res), print_time('Time: '),
+    %findall(Res, bosh(SearchOptions,Fs, Res), ResAll),
+    bosh(SearchOptions, Fs, Res), print_time('Time: '),
     %set_prolog_flag(gc,on), 
-    fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), 
+    fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]),  nl, 
     fd_statistics.
     %statistics.
 
 
+% shelve a N families, starting with family NI 
+go(SearchOptions, NI, N) :- families_sorted(Fs), go(SearchOptions, NI, N, Fs).
 
-go([VarsSelectionOption, LabelingOption]) :-  families_sorted(Fs), length(Fs, L), go([VarsSelectionOption, LabelingOption], 1, L, Fs).
-go(N) :- go([1,1], N).
-go :- go([1,1]).
+% shelve one specify family
+go(SearchOptions, N) :- families_sorted(Fs), go(SearchOptions, N, 1, Fs).
 
-go([VarsSelectionOption, LabelingOption], N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], N, 1, Fs).
-go([VarsSelectionOption, LabelingOption], NI, N) :- families_sorted(Fs), go([VarsSelectionOption, LabelingOption], NI, N, Fs).
+% shelve all families, one by one,
+go(SearchOptions) :-  families_sorted(Fs), length(Fs, L), go(SearchOptions, 1, L, Fs).
+
+% shelve one specify family, with best strategy
+go(N) :- go([1, 1], N).
+
+% shelve all families, one by one, with best strategy
+go :- go([1, 1]).
 
 
+
+
+
+% shelve one family with several SearchOption and write results in a file.
 go_all_options(N) :-
     families_sorted(Fs),
-    %nth1(N, Fs, F),
-    ( foreach(VarsSelectionOption, [2]),
+    ( foreach(VarsSelectionOption, [1, 2]),
 %    ( foreach(VarsSelectionOption, [1]),
       foreach(R1s, Rs),
       param(N, Fs) do
 %      ( foreach(LabelingOption, [6]),
 %      ( foreach(LabelingOption, [1,2,3,4,5,6]),
-      ( foreach(LabelingOption, [21,22,24,26]),
 %      ( foreach(LabelingOption, [1,2,3,4,5,6,11,12,13,14,15,16,21,22,23,24,25,26,31,32,33,34,35,36]),
-%      ( foreach(LabelingOption, [1,3,5,21,23,25]),
+      ( foreach(LabelingOption, [1,3,5,21,23,25]),
         foreach(R, R1s),
         param(N, Fs, VarsSelectionOption) do
             ( catch(go_all_options([VarsSelectionOption, LabelingOption], N, 1, Fs, Time, NBay),
@@ -227,37 +225,34 @@ go_all_options(N) :-
 %      append(R1s, R1sFlat)
     ), print(Rs),
     write_matrix_in_file('../sicstus/output/result_all_options.py', 'Rs', Rs).
-
-go_all_options([VarsSelectionOption, LabelingOption], NI, N, FsFull, Time, NBay) :- 
+go_all_options(SearchOptions, NI, N, FsFull, Time, NBay) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts), !,
-    %statistics, 
     reset_timer,
-    bosh([VarsSelectionOption, LabelingOption], Fs, Res), !,
+    bosh(SearchOptions, Fs, Res), !,
     get_time(Time),
     Res = res(_CPs, NBay).
 
 
-go_timer_stats :-  go_timer_stats([1, 1]).
-
-go_timer_stats([VarsSelectionOption, LabelingOption]) :-
+% shelve all families, one by one, and write time and bay results for each one.
+go_timer_stats :-
+  go_timer_stats([1, 1]).
+go_timer_stats(SearchOptions) :-
     families_sorted(Fs),
     length(Fs, L),
-    go_timer_stats([VarsSelectionOption, LabelingOption], 1, L, Fs).
-
-go_timer_stats([VarsSelectionOption, LabelingOption], NI, N, FsFull) :- 
+    go_timer_stats(SearchOptions, 1, L, Fs).
+go_timer_stats(SearchOptions, NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts),
-
     ( foreach(F, Fs),
       foreach(M, Ms),
-      param(VarsSelectionOption, LabelingOption) do
+      param(SearchOptions) do
         F = [product(N, _, _, _, _)|_],
         length(F, L),
         reset_timer,
-        bosh([VarsSelectionOption, LabelingOption], [F], Res),
+        bosh(SearchOptions, [F], Res),
         get_time(T),
         Res = res(_CPs, NBay),
         M = [N, L, T, NBay]
@@ -267,25 +262,12 @@ go_timer_stats([VarsSelectionOption, LabelingOption], NI, N, FsFull) :-
 
 
 
-goAll([VarsSelectionOption, LabelingOption]) :-
-    read_products(Ps),
-    maplist(samsort(by_volume), [Ps], Fs),
-     !, fd_statistics, reset_timer,
-     bosh([VarsSelectionOption, LabelingOption], Fs, Res), print_time('Time: '),
-     fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), fd_statistics.%, statistics.
-
-
-goU([VarsSelectionOption, LabelingOption], N) :- families(Fs), go([VarsSelectionOption, LabelingOption], N, 1, Fs).
-
-
-
-
 %-------------------------------------------------------------------------
 %  Unit tests
 %-------------------------------------------------------------------------
 :- use_module(library(plunit)).
 
-:- begin_tests(bosh).
+:- begin_tests(bosh_cumulative).
 
 test(rotate_grouded) :-
     rotate([1,2,3], [1,2,3]),
@@ -298,21 +280,22 @@ test(rotate_grouded) :-
 test(rotate_grouded) :-
     rotate([100,100,300], [300,100,100]).
 
-test(rotate_vars, nondet) :-
-    rotate([1,2,3], [RL,RH,RW]),
+% rotate give us a permutation of dimentions (without grounding the domain variables)
+test(rotate, nondet) :-
+    rotate([1,2,3], [RL,RH,RW]), 
+    RL in{1}\/{2}\/{3},
+    RH in{1}\/{2}\/{3},
+    RW in{1}\/{2}\/{3},
     permutation([1,2,3], [RL,RH,RW]).
 
-% product(F, Q, L, H, W)
-% group_product(product(F, Q, L, H, W))
+test('group - grounded') :- 
+    group_products([product(1, 5, 100, 620, 700)], [3000], 15, [1], 
+        [task(1, 1, 2, 710, 1)], [product(1, 5, 100, 620, 700)-grouped(710, 500, 620, 700, 100, 620)]).
 
-test('group - grounded') :- group_products([product(1, 5, 100, 620, 700)],
-    3000, 15, [710,500,620], [product(1, 5, 100, 620, 700)-grouped(710, 500, 620, 700, 100, 620)],[]).
 
-test(group) :- 
-    MaxH in 0..1000, 
+test(group) :-     
     Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, MaxH, 55, [BL,BW,BH],
-        [product(1, 7, 100, 620, 700)-grouped(BL, BW, BH, RL, RW, RH)], []),
+    group_products(Ps, [MaxH], 55, [V], [task(V,1,_,GL,1)], [product(1, 7, 100, 620, 700)-grouped(BL, BW, BH, RL, RW, RH)]),
     MaxH in 155..1000,
     RL in{100}\/{620}\/{700},
     RH in{100}\/{620}\/{700},
@@ -321,23 +304,4 @@ test(group) :-
     BH in 100..4900,
     BW in 100..3720.  
 
-test('group - droped prod') :- 
-    MaxH in 0..100,
-    Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, MaxH, 55, [], [], [product(1, 7, 100, 620, 700)]).
-
-test('group - list 2 prod') :- 
-    MaxH in 0..100,
-    Ps = [product(1, 7, 100, 620, 700), product(1, 2, 10, 620, 70)],
-    group_products(Ps, MaxH, 55, [BL,BW,BH],
-        [product(1, 2, 10, 620, 70)-grouped(BL, BW, BH, RL, RW, RH)],
-        [product(1, 7, 100, 620, 700)]),  
-    RH = 10,
-    MaxH in 65..100,
-    RL in{70}\/{620},
-    RW in{70}\/{620},
-    BL in 80..1250,
-    BH in 10..20,
-    BW in 70..1240.
-
-:- end_tests(bosh).
+:- end_tests(bosh_cumulative).
