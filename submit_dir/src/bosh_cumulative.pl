@@ -1,0 +1,340 @@
+:- use_module(library(clpfd)).
+:- use_module(library(lists)).
+:- use_module(library(between)).
+:- consult('process_files.pl').
+:- consult('bosh_labeling.pl').
+:- consult('export_cumulative.pl').
+
+/*
+For each product in turn:
+   product family, quantity to be shelved, length, width, height
+
+All orientations of each product are allowed and no product is allowed 
+to overhang a shelf.
+
+The two test problems have different bay files. 
+These files are baytp1 and baytp2 and the format of these files is:
+
+For each bay in turn:
+   width, height, depth, available height
+    1200   2400    650     3000
+Bays must be shelved used in same sequence as given in each file.
+
+Each bay can have a number of possible shelves.
+These are given in the file shelves
+The format of this file is:
+
+For each shelf in turn:
+    shelf number, thickness, position, top gap, left gap, inter gap, right gap
+	37 				40 			1800 	15 			10 		10 			10 
+*/
+
+reset_timer:-
+	statistics(walltime, _).
+get_time(TS) :- 
+	statistics(walltime,[_,T]),
+	TS is ((T//10)*10)/1000.
+
+print_time(Msg):-
+	get_time(TS), nl, 
+    write(Msg),
+	write(TS),
+	write('s'), nl.
+
+
+% bay(width, height, depth, available height)
+% add 50 to available height for dealing with top gap of first shelf, 
+% in this approach top gap are treated as same for all shelves
+bay(1200, 2400, 650, 3050). 
+max_available_height(H) :- bay(_,_,_, H).
+
+% shelf(thickness, top gap, left gap, inter gap, right gap)
+shelf(40, 15, 10, 10, 10).
+
+
+% rotate(+ProductDimensions, -RotatedProductDimensions)
+rotate(ProductDimensions, [RL, RH, RW]) :- 
+    all_distinct([IL, IW, IH]),
+    element(IL, ProductDimensions, RL),
+    element(IH, ProductDimensions, RH),
+    element(IW, ProductDimensions, RW).
+
+% group_products(+Products, +MaxHs, +TopGap, -Shelves, -ShelvesTasks,-GroupedProducts)
+% products     : products to be shelved
+% MaxHs        : list with heights of all shelves
+% TopGap       : gap on top of shelf
+% Shelves      : list of shelf numbers of the each product
+% ShelvesTasks : list of tasks for the first cumulative (for putting product on shelves)
+% GPs          : all possible grouped-products, with information for shelving 
+group_products([], _, _, [], [], []) :- !.
+group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
+        [Shelf|Shelves], [task(Shelf,1,_,GL,1)|Tasks], 
+        [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPs]) :-
+    bay(SL, _, SW, _),
+    shelf(_THICK, _TG, LG, IG, _RG),
+
+    element(Shelf, MaxHs, MaxH),
+
+    rotate([L, H, W], [RL, RH, RW]), 
+	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
+
+    GL #= NL * RL + IG,
+    GH #= NH * RH,
+    GW #= NW * RW,
+
+    GL + IG + LG #=< SL ,
+   	GH + TopGap #=< MaxH,
+	GW #=< SW, ((NW+1) * RW #> SW #\/ (NH #= 1 #/\ NL #= 1 #/\ NW #= Q)),
+
+    NL * NH * NW #>= Q,
+	(NL * NH * NW) * 31 #=< Q * 50,
+    !, group_products(Ps, MaxHs, TopGap, Shelves, Tasks, GPs).
+
+% maxH_domain(+AvalH, +NShelves, -MaxHs)
+% return the list with possible height  of shelves
+% AvalH : height aavaliable on bay for the next shelf
+% NShelves : maximun number of shelves 
+% MaxHs          : list with heights of all shelves, with their domain defined
+maxH_domain(AvalH, NShelves, MaxHs) :-
+    % 100 = minimal space between shelves
+    % 50 = inteval between shelves heights
+    numlist(100, 50, AvalH, _, MaxHDomain),
+	list_to_fdset([0|MaxHDomain], FDS_MaxHDomain),	
+	length(MaxHs, NShelves),
+	( foreach(MaxH, MaxHs),
+	  param(FDS_MaxHDomain)	do 
+      MaxH in_set FDS_MaxHDomain
+    ).
+
+
+% shelve_products(+GPs, +Shelves, +MaxHs, +Bays, -CPs)
+% GPs      : grouped-products, with information for shelving 
+% Shelves  : list of shelf numbers of the each product
+% MaxHs    : list with heights of all shelves
+% Bays     : bay number of the each shelf 
+% CPs      : list with products shelved, with info  about their final shelf and bay number
+shelve_products([], [], _, _, []).
+shelve_products([P-G|GPsTail], [Shelf|Shelves], MaxHs, Bays, [(Bay, Shelf, MaxH)-(P-G)|CPs]) :-
+    element(Shelf, Bays, Bay),
+    element(Shelf, MaxHs, MaxH),
+	shelve_products(GPsTail, Shelves, MaxHs, Bays, CPs).
+
+
+first_shelves_aux([], [], []).
+first_shelves_aux([Bay|Bays], [MaxH|MaxHs], [F|Fs]) :-
+    bay(_, BH, _, AvalH),
+    MaxH #>= (AvalH - BH) #<=> B,
+    F #= B * Bay,
+    first_shelves_aux(Bays, MaxHs, Fs).
+
+% define the constraint: all bays need to have at least one shelf taller than (AvaliableBayHeight - BayHeight)
+% first_shelves_constraint(+Bays, +MaxHs, +NBay)
+% Bays  : list with bay number of each shelf
+% MaxHs : height of each shelf
+% NBay  : number of bays used
+first_shelves_constraint(Bays, MaxHs, NBay) :-
+    first_shelves_aux(Bays, MaxHs, Fs),
+    NBay1 #= NBay + 1,
+    nvalue(NBay1, Fs).
+
+% get_tasks_bays(MaxHs, TasksBays, Bays)
+% MaxHs    : list with heights of all shelves
+% TasksBays : tasks for second cumulative, for putting shelves on bays
+% Bays     : bay number of the each shelf 
+get_tasks_bays([], [], []).
+get_tasks_bays([MaxH|MaxHs], [task(Bay, 1, _, MaxH, 1)|TasksBays], [Bay|Bays]):-
+    get_tasks_bays(MaxHs, TasksBays, Bays).
+
+
+
+bosh(SearchOptions, Fs, res(CPs, NBay)) :-
+    max_available_height(AvalH),
+    bosh(SearchOptions, Fs, AvalH, CPs, NBay).
+
+
+% bosh(+SearchOptions, +Fs, +AvalH, -Bay, -CPs, -DPs
+% SearchOptions : options for order and labeling 
+% Fs            : list of families of products
+% AvalH         : space avaliable for the next shelf
+% CPs           : properties of chosen products
+% NBay           : number of bays used
+bosh(_, [], _, [], 0).
+bosh(SearchOptions, [F|Fs], AvalH, CPs, NBay) :-
+    bosh_family(SearchOptions, F, AvalH, CPs1, NBay1),
+    bosh(SearchOptions, Fs, AvalH, CPsTail, NBayTail),
+    append(CPs1, CPsTail, CPs),
+    NBay is NBay1 + NBayTail.
+bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
+    nl,
+    length(F, Size), F = [product(NF,_,_,_,_)|_], 
+    format('Family: ~p, Size: ~p', [NF, Size]), nl,
+
+    bay(MaxSL, _, _, MaxSH),
+    shelf(THICK, TG, LG, _IG, _RG),
+	
+    % in this approach, top gap allways be the same;max avaliable height (MaxSH) one "degree" above (3050 in this case) 
+    TopGap is THICK + TG, 
+    
+    maxH_domain(AvalH, 100, MaxHs),
+
+    group_products(F, MaxHs, TopGap, Shelves, Tasks, GPs),
+    domain(Shelves, 1, 100),
+
+    MaxL #>0, MaxL #=< MaxSL - LG,
+    MaxL is MaxSL - LG,
+    cumulative(Tasks, [limit(MaxL), global(true)]),
+
+    get_tasks_bays(MaxHs, TasksBays, Bays),
+    domain(Bays, 1, 50),
+
+    cumulative(TasksBays, [limit(MaxSH), global(true)]),
+
+    cumulative_vars_orders(VarsSelectionOption, Shelves, GPs, MaxHs, Bays, Vars),
+
+    maximum(NBay, Bays),
+    first_shelves_constraint(Bays, MaxHs, NBay),
+
+    %sum(MaxHs, #=, MaxHsSum),    
+    %Cost * 50 #= MaxHsSum,
+    Cost  #= NBay,
+ 
+    bosh_labeling(LabelingOption, Vars, Cost, 5000),
+    shelve_products(GPs, Shelves, MaxHs, Bays, CPs).
+
+go(SearchOptions, NI, N, FsFull) :- 
+    NI > 0, NI1 is NI - 1,
+    length(Pre, NI1), append(Pre, Ts, FsFull),
+    length(Fs, N), append(Fs,_, Ts), !,
+    %statistics, 
+    %fd_statistics, 
+    reset_timer,
+    %findall(Res, bosh(SearchOptions,Fs, Res), ResAll),
+    bosh(SearchOptions, Fs, Res), print_time('Time: '),
+    %fd_statistics, 
+    Res = res(_CPs, NBay),
+    nl, format('Number of bays used: ~p', NBay), nl, nl.
+    %statistics.
+
+
+% shelve a N families, starting with family NI 
+go(SearchOptions, NI, N) :- families_sorted(Fs), go(SearchOptions, NI, N, Fs).
+
+% shelve one specify family
+go(SearchOptions, N) :- families_sorted(Fs), go(SearchOptions, N, 1, Fs).
+
+% shelve all families, one by one,
+go(SearchOptions) :-  families_sorted(Fs), length(Fs, L), go(SearchOptions, 1, L, Fs).
+
+% shelve one specify family, with best strategy
+go(N) :- go([1, 1], N).
+
+% shelve all families, one by one, with best strategy
+go :- go([1, 1]).
+
+
+
+
+
+% shelve one family with several SearchOption and write results in a file.
+go_all_options(N) :-
+    families_sorted(Fs),
+    ( foreach(VarsSelectionOption, [1, 2]),
+%    ( foreach(VarsSelectionOption, [1]),
+      foreach(R1s, Rs),
+      param(N, Fs) do
+%      ( foreach(LabelingOption, [6]),
+%      ( foreach(LabelingOption, [1,2,3,4,5,6]),
+%      ( foreach(LabelingOption, [1,2,3,4,5,6,11,12,13,14,15,16,21,22,23,24,25,26,31,32,33,34,35,36]),
+      ( foreach(LabelingOption, [1,3,5,21,23,25]),
+        foreach(R, R1s),
+        param(N, Fs, VarsSelectionOption) do
+            ( catch(go_all_options([VarsSelectionOption, LabelingOption], N, 1, Fs, Time, NBay),
+                _Ex, [Time, NBay] = [0,0]), 
+              R = [VarsSelectionOption, LabelingOption, N, Time, NBay]
+            ; R = [VarsSelectionOption, LabelingOption, N, 0, 0]
+            ), !, print(R)
+      )
+%      append(R1s, R1sFlat)
+    ), print(Rs),
+    write_matrix_in_file('output/result_all_options.py', 'Rs', Rs).
+go_all_options(SearchOptions, NI, N, FsFull, Time, NBay) :- 
+    NI > 0, NI1 is NI - 1,
+    length(Pre, NI1), append(Pre, Ts, FsFull),
+    length(Fs, N), append(Fs,_, Ts), !,
+    reset_timer,
+    bosh(SearchOptions, Fs, Res), !,
+    get_time(Time),
+    Res = res(_CPs, NBay).
+
+
+% shelve all families, one by one, and write time and bay results for each one.
+go_timer_stats :-
+  go_timer_stats([1, 1]).
+go_timer_stats(SearchOptions) :-
+    families_sorted(Fs),
+    length(Fs, L),
+    go_timer_stats(SearchOptions, 1, L, Fs).
+go_timer_stats(SearchOptions, NI, N, FsFull) :- 
+    NI > 0, NI1 is NI - 1,
+    length(Pre, NI1), append(Pre, Ts, FsFull),
+    length(Fs, N), append(Fs,_, Ts),
+    ( foreach(F, Fs),
+      foreach(M, Ms),
+      param(SearchOptions) do
+        F = [product(N, _, _, _, _)|_],
+        length(F, L),
+        reset_timer,
+        bosh(SearchOptions, [F], Res),
+        get_time(T),
+        Res = res(_CPs, NBay),
+        M = [N, L, T, NBay]
+    ),
+    write_matrix_in_file('output/result_stats.py', 'Ms', Ms),
+    write_file('output/result_stats.csv', Ms).
+
+
+
+%-------------------------------------------------------------------------
+%  Unit tests
+%-------------------------------------------------------------------------
+:- use_module(library(plunit)).
+
+:- begin_tests(bosh_cumulative).
+
+test(rotate_grouded) :-
+    rotate([1,2,3], [1,2,3]),
+    rotate([1,2,3], [1,3,2]),
+    rotate([1,2,3], [2,1,3]),
+    rotate([1,2,3], [2,3,1]),
+    rotate([1,2,3], [3,1,2]),
+    rotate([1,2,3], [3,2,1]).
+
+test(rotate_grouded) :-
+    rotate([100,100,300], [300,100,100]).
+
+% rotate give us a permutation of dimentions (without grounding the domain variables)
+test(rotate, nondet) :-
+    rotate([1,2,3], [RL,RH,RW]), 
+    RL in{1}\/{2}\/{3},
+    RH in{1}\/{2}\/{3},
+    RW in{1}\/{2}\/{3},
+    permutation([1,2,3], [RL,RH,RW]).
+
+test('group - grounded') :- 
+    group_products([product(1, 5, 100, 620, 700)], [3000], 15, [1], 
+        [task(1, 1, 2, 710, 1)], [product(1, 5, 100, 620, 700)-grouped(710, 500, 620, 700, 100, 620)]).
+
+
+test(group) :-     
+    Ps = [product(1, 7, 100, 620, 700)],
+    group_products(Ps, [MaxH], 55, [Shelf], [task(Shelf,1,_,GL,1)], [product(1, 7, 100, 620, 700)-grouped(GL, GW, GH, RL, RW, RH)]),
+    Shelf = 1, 
+    MaxH in 155..1000,
+    RL in{100}\/{620}\/{700},
+    RH in{100}\/{620}\/{700},
+    RW in{100}\/{620},
+    GL in 110..4910,
+    GH in 100..4900,
+    GW in 100..3720.  
+
+:- end_tests(bosh_cumulative).
