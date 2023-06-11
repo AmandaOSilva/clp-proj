@@ -49,7 +49,7 @@ process_bays([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) 
 
 by_bay_shelve((B1, S1, H1)-_, (B2, S2, H2)-_) :- 
     B2 * 100 + S2 > B1 * 100 + S1
-    ; B1 = B2, S1 = S2, H2 < H1.
+    ; B1 = B2, S1 = S2, H1 > H2.
 
 group_pairs_by_key([], []).
 group_pairs_by_key([K-V|KVs0], [K-[V|Vs]|KVs]) :-
@@ -70,9 +70,9 @@ go_vis(SearchOptions, N, Res) :-
     nl, format('Number of bays used: ~p', NBay), nl, nl.
 
 go_export(N) :-
-    go_export([3, 1], N).
+    go_export([1, 1], N).
 go_export(SearchOptions, N) :-
-    go_vis(SearchOptions, N,res(CPs, _DPs)),
+    go_vis(SearchOptions, N,res(CPs, _)),
     samsort(by_bay_shelve, CPs, CPsSorted),
     group_pairs_by_key(CPsSorted, CPsByShelve),
     group(same_bay, CPsByShelve, CPsByBay),

@@ -1,12 +1,8 @@
 :- use_module(library(clpfd)).
 
-weaving_vars([], [], [], []). 
-weaving_vars([V|Vs],[_-grouped(GL, GW, GH, RL, RW, RH)|GPs], [GL, RL, GH, RH, GW, RW, V|WeavingVars], [GL, RL, GH, RH, GW, RW |Ls]) :-
-	weaving_vars(Vs, GPs, WeavingVars, Ls).
-
-weaving_vars([], [], []). 
-weaving_vars([C|Cs], [GL, GW, GH|Gs], [GL, GW, GH, C|AllVs]) :-
-	weaving_vars(Cs, Gs, AllVs).
+paper_weaving_vars([], [], []). 
+paper_weaving_vars([C|Cs], [GL, GW, GH|Gs], [GL, GW, GH, C|AllVs]) :-
+	paper_weaving_vars(Cs, Gs, AllVs).
 
 paper_vars_orders(1, Cs, Gs, MaxH, _AntiCs, Vars) :-
     append(Gs, Cs, Vs1),
@@ -22,16 +18,14 @@ paper_vars_orders(3, _Cs, Gs, MaxH, AntiCs, Vars) :-
 	append(Vs1, [MaxH], Vars).
 
 
-cumulative_vars_orders(1, Vs, GPs, MaxHs, Bays, Vars) :-
-    weaving_vars(Vs, GPs, _Gs, Ls),
-	append(Ls, Vs, Vs2),
-	append(Vs2, MaxHs, Vs3),
-	append(Vs3, Bays, Vars).
+cumulative_weaving_vars([], [], []). 
+cumulative_weaving_vars([Shelf|Shelves],[_-grouped(GL, GW, GH, RL, RW, RH)|GPs], [GL, RL, GH, RH, GW, RW, Shelf|WeavingVars]) :-
+	cumulative_weaving_vars(Shelves, GPs, WeavingVars).
 
-% weaving 
-cumulative_vars_orders(2, _Vs, Gs, MaxHs, Bays, Vars) :-
-	append(Gs, MaxHs, Vs3),
-	append(Vs3, Bays, Vars).
+cumulative_vars_orders(1, Shelves, GPs, MaxHs, Bays, Vars) :-
+    cumulative_weaving_vars(Shelves, GPs, Vs1),
+	append(Vs1, MaxHs, Vs2),
+	append(Vs2, Bays, Vars).
 
 
 labeling_options(1, []).

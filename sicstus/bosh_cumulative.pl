@@ -64,12 +64,12 @@ rotate(ProductDimensions, [RL, RH, RW]) :-
 % group_product(+Product, +MaxH, +TopGap, -Variables, -GroupedProducts)
 group_products([], _, _, [], [], []) :- !.
 group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
-        [V|Vs], [task(V,1,_,GL,1)|Tasks], 
+        [Shelf|Shelves], [task(Shelf,1,_,GL,1)|Tasks], 
         [product(_F, Q, L, H, W)-grouped(GL, GW, GH, RL, RW, RH)|GPs]) :-
     bay(SL, _, SW, _),
     shelf(_THICK, _TG, LG, IG, _RG),
 
-    element(V, MaxHs, MaxH),
+    element(Shelf, MaxHs, MaxH),
 
     rotate([L, H, W], [RL, RH, RW]), 
 	NL in 1..Q, NH in 1..Q, NW in 1..Q,		
@@ -84,7 +84,7 @@ group_products([product(_F, Q, L, H, W)|Ps], MaxHs, TopGap,
 
     NL * NH * NW #>= Q,
 	(NL * NH * NW) * 31 #=< Q * 50,
-    !, group_products(Ps, MaxHs, TopGap, Vs, Tasks, GPs).
+    !, group_products(Ps, MaxHs, TopGap, Shelves, Tasks, GPs).
 
 % get the doamin of shelves height (MaxHs)
 maxH_domain(AvalH, NShelves, MaxHs) :-
@@ -99,22 +99,24 @@ maxH_domain(AvalH, NShelves, MaxHs) :-
     ).
 
 % shelve products, put then into shelves and shelves in to bays.
-shelve([], [], _, _, []).
-shelve([P-G|GPsTail], [V|Vs], MaxHs, Bays, [(Bay, V, MaxH)-(P-G)|CPs]) :-
-    element(V, Bays, Bay),
-    element(V, MaxHs, MaxH),
-	shelve(GPsTail, Vs, MaxHs, Bays, CPs).
+shelve_products([], [], _, _, []).
+shelve_products([P-G|GPsTail], [Shelf|Shelves], MaxHs, Bays, [(Bay, Shelf, MaxH)-(P-G)|CPs]) :-
+    element(Shelf, Bays, Bay),
+    element(Shelf, MaxHs, MaxH),
+	shelve_products(GPsTail, Shelves, MaxHs, Bays, CPs).
 
-first_shelves(Bays, MaxHs, NBays) :-
-    same_length(Fs, Bays),
-    ( foreach(Bay, Bays),
-      foreach(F, Fs),
-      param(MaxHs) do 
-      element(Bay, MaxHs, MaxH),
-      MaxH #>= 650 #<=> B,
-      F #= B * Bay
-    ),
-    nvalue(NBays, Fs). 
+% all bays need to have at least one shelf heither than (AvaliableBayHeight - BayHeight)
+first_shelves([], [], []).
+first_shelves([Bay|Bays], [MaxH|MaxHs], [F|Fs]) :-
+    bay(_, BH, _, AvalH),
+    MaxH #>= (AvalH - BH) #<=> B,
+    F #= B * Bay,
+    first_shelves(Bays, MaxHs, Fs).
+
+first_shelves_constraint(Bays, MaxHs, NBay) :-
+    first_shelves(Bays, MaxHs, Fs),
+    NBay1 #= NBay + 1,
+    nvalue(NBay1, Fs).
 
 get_tasks_bays([], [], []).
 get_tasks_bays([MaxH|MaxHs], [task(Bay, 1, _, MaxH, 1)|TasksBays], [Bay|Bays]):-
@@ -127,9 +129,10 @@ bosh(SearchOptions, Fs, res(CPs, NBay)) :-
     bosh(SearchOptions, Fs, AvalH, CPs, NBay).
 
 bosh(_, [], _, [], 0).
-bosh(SearchOptions, [F|Fs], AvalH, [CPs|CPsTails], NBay) :-
-    bosh_family(SearchOptions, F, AvalH, CPs, NBay1),
-    bosh(SearchOptions, Fs, AvalH, CPsTails, NBayTail),
+bosh(SearchOptions, [F|Fs], AvalH, CPs, NBay) :-
+    bosh_family(SearchOptions, F, AvalH, CPs1, NBay1),
+    bosh(SearchOptions, Fs, AvalH, CPsTail, NBayTail),
+    append(CPs1, CPsTail, CPs),
     NBay is NBay1 + NBayTail.
 
 
@@ -146,8 +149,8 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
     
     maxH_domain(AvalH, 100, MaxHs),
 
-    group_products(F, MaxHs, TopGap, Vs, Tasks, GPs),
-    domain(Vs, 1, 100),
+    group_products(F, MaxHs, TopGap, Shelves, Tasks, GPs),
+    domain(Shelves, 1, 100),
 
     MaxL #>0, MaxL #=< MaxSL - LG,
     MaxL is MaxSL - LG,
@@ -158,18 +161,17 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
 
     cumulative(TasksBays, [limit(MaxSH), global(true)]),
 
-    cumulative_vars_orders(VarsSelectionOption, Vs, GPs, MaxHs, Bays, Vars),
+    cumulative_vars_orders(VarsSelectionOption, Shelves, GPs, MaxHs, Bays, Vars),
 
-    %sum(MaxHs, #=, Shelves),    
     maximum(NBay, Bays),
+    first_shelves_constraint(Bays, MaxHs, NBay),
 
-    first_shelves(Bays, MaxHs, NBay),
-
-    %Cost * 50 #= Shelves,
+    %sum(MaxHs, #=, MaxHsSum),    
+    %Cost * 50 #= MaxHsSum,
     Cost  #= NBay,
  
     bosh_labeling(LabelingOption, Vars, Cost, 5000),
-    shelve(GPs, Vs, MaxHs, Bays, CPs).
+    shelve_products(GPs, Shelves, MaxHs, Bays, CPs).
 
 go(SearchOptions, NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
@@ -297,7 +299,8 @@ test('group - grounded') :-
 
 test(group) :-     
     Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, [MaxH], 55, [V], [task(V,1,_,GL,1)], [product(1, 7, 100, 620, 700)-grouped(GL, GW, GH, RL, RW, RH)]),
+    group_products(Ps, [MaxH], 55, [Shelf], [task(Shelf,1,_,GL,1)], [product(1, 7, 100, 620, 700)-grouped(GL, GW, GH, RL, RW, RH)]),
+    Shelf = 1, 
     MaxH in 155..1000,
     RL in{100}\/{620}\/{700},
     RH in{100}\/{620}\/{700},
