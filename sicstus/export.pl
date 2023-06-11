@@ -43,12 +43,17 @@ process_bays([BayCPs|CPs], [Ps|PsTail], [Sizes|SizesTail], [Colors|ColorsTail]) 
     append(['"k"', '"grey"', '"grey"'], Colors1, Colors),
     process_bays(CPs, PsTail, SizesTail, ColorsTail).
 
-
 go_vis(SearchOptions, N, Res) :-  
-    fd_statistics, reset_timer, 
+    %fd_statistics, 
+    reset_timer, 
     families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
-    bosh(SearchOptions, [F], Res), !, Res = res(GPs, _), 
-    nl, length(GPs, L), print([L]), fd_statistics.%, statistics.
+    bosh(SearchOptions, [F], Res), !, 
+    Res = res(CPs, _DPs), 
+    last(CPs, (NBay, _, _)-_),
+    nl, format('Number of bays used: ~p', NBay), nl, nl.
+    %, fd_statistics.
+    %, statistics.
+
 go_export(N) :-
     go_export([3, 1], N).
 go_export(SearchOptions, N) :-

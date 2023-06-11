@@ -23,7 +23,7 @@ paper_vars_orders(3, _Cs, Gs, MaxH, AntiCs, Vars) :-
 
 
 cumulative_vars_orders(1, Vs, GPs, MaxHs, Bays, Vars) :-
-    weaving_vars(Vs, GPs, Gs, Ls),
+    weaving_vars(Vs, GPs, _Gs, Ls),
 	append(Ls, Vs, Vs2),
 	append(Vs2, MaxHs, Vs3),
 	append(Vs3, Bays, Vars).

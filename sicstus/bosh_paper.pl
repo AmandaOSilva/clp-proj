@@ -119,7 +119,8 @@ bosh(SearchOptions, [[]|Fs], AvalH, Bay, CPs, DPs) :-
 
 bosh(SearchOptions, [F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :-
     length(F, Size), F = [product(NF,_,_,_,_)|_], 
-    write([NF, AvalH, Bay, Size]), nl,
+    format('Family: ~p, Size: ~p, Bay: ~p, Avaliable height: ~p', [NF, Size, Bay, AvalH]), nl,
+
     bay(MaxSL, _, _, MaxSH),
     shelf(THICK, TG, LG, _IG, _RG),
 
@@ -142,7 +143,7 @@ bosh(SearchOptions, [F|Fs], AvalH, Bay, [(Bay, NF, ShelveH)-CPs|CPsTail], DPs) :
 
     %Cost #= MaxH + MaxSL - LG - MaxL,
     Cost #= MaxH,
-    bosh_labeling(LabelingOption, Vars, Cost, 6000),
+    bosh_labeling(LabelingOption, Vars, Cost, 10000),
 	split_chosen(GPs, Cs, CPs, RPs),
 	length(CPs, L1),
     ( L1 > 0, !; false ),
@@ -160,12 +161,14 @@ go(SearchOptions, NI, N, FsFull) :-
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts), !,
     %statistics, 
-    fd_statistics, reset_timer,
+    %fd_statistics, 
+    reset_timer,
     bosh(SearchOptions, Fs, Res), print_time('Time: '),
-    fd_statistics, 
-    Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]), nl,
-    fd_statistics.
-    %statistics.
+    %fd_statistics, 
+    %statistics,
+    Res = res(CPs, _DPs), 
+    last(CPs, (NBay, _, _)-_),
+    nl, format('Number of bays used: ~p', NBay), nl, nl.
 
 
 % shelve a N families, starting with family NI 
@@ -202,7 +205,7 @@ go_all_options(N) :-
             ; R = [VarsSelectionOption, LabelingOption, N, 0, 0]
             ), !, print(R)
       )
-    ), print(Rs),
+    ), nl, print(Rs), nl,
     write_matrix_in_file('../sicstus/output/result_all_options.py', 'Rs', Rs).
 go_all_options(SearchOptions, NI, N, FsFull, Time, NBay) :- 
     NI > 0, NI1 is NI - 1,
@@ -275,15 +278,15 @@ test('group - grounded') :- group_products([product(1, 5, 100, 620, 700)],
 test(group) :- 
     MaxH in 0..1000, 
     Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, MaxH, 55, [BL,BW,BH],
-        [product(1, 7, 100, 620, 700)-grouped(BL, BW, BH, RL, RW, RH)], []),
+    group_products(Ps, MaxH, 55, [GL,GW,GH],
+        [product(1, 7, 100, 620, 700)-grouped(GL, GW, GH, RL, RW, RH)], []),
     MaxH in 155..1000,
     RL in{100}\/{620}\/{700},
     RH in{100}\/{620}\/{700},
     RW in{100}\/{620},
-    BL in 110..4910,
-    BH in 100..4900,
-    BW in 100..3720.  
+    GL in 110..4910,
+    GH in 100..4900,
+    GW in 100..3720.  
 
 test('group - droped prod') :- 
     MaxH in 0..100,
@@ -293,15 +296,15 @@ test('group - droped prod') :-
 test('group - list 2 prod') :- 
     MaxH in 0..100,
     Ps = [product(1, 7, 100, 620, 700), product(1, 2, 10, 620, 70)],
-    group_products(Ps, MaxH, 55, [BL,BW,BH],
-        [product(1, 2, 10, 620, 70)-grouped(BL, BW, BH, RL, RW, RH)],
+    group_products(Ps, MaxH, 55, [GL,GW,GH],
+        [product(1, 2, 10, 620, 70)-grouped(GL, GW, GH, RL, RW, RH)],
         [product(1, 7, 100, 620, 700)]),  
     RH = 10,
     MaxH in 65..100,
     RL in{70}\/{620},
     RW in{70}\/{620},
-    BL in 80..1250,
-    BH in 10..20,
-    BW in 70..1240.
+    GL in 80..1250,
+    GH in 10..20,
+    GW in 70..1240.
 
 :- end_tests(bosh).

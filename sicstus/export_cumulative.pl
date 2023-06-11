@@ -63,10 +63,11 @@ same_key(_, KVs, [], KVs).
 
 
 go_vis(SearchOptions, N, Res) :-  
-    fd_statistics, reset_timer, 
+    reset_timer, 
     families_sorted(Fs), print_time('Pre processing'), nth1(N, Fs, F), 
-    bosh(SearchOptions, [F], Res), !, Res = res(GPs, _), 
-    nl, length(GPs, L), print([L]), fd_statistics.
+    bosh(SearchOptions, [F], Res), !, 
+    Res = res(_CPs, NBay),
+    nl, format('Number of bays used: ~p', NBay), nl, nl.
 
 go_export(N) :-
     go_export([3, 1], N).

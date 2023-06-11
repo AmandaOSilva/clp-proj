@@ -135,7 +135,9 @@ bosh(SearchOptions, [F|Fs], AvalH, [CPs|CPsTails], NBay) :-
 
 bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
     nl,
-    length(F, Size), F = [product(NF,_,_,_,_)|_], write([NF, Size]), 
+    length(F, Size), F = [product(NF,_,_,_,_)|_], 
+    format('Family: ~p, Size: ~p', [NF, Size]), nl,
+
     bay(MaxSL, _, _, MaxSH),
     shelf(THICK, TG, LG, _IG, _RG),
 	
@@ -166,21 +168,21 @@ bosh_family([VarsSelectionOption, LabelingOption], F, AvalH, CPs, NBay) :-
     %Cost * 50 #= Shelves,
     Cost  #= NBay,
  
-    bosh_labeling(LabelingOption, Vars, Cost, 3000),
+    bosh_labeling(LabelingOption, Vars, Cost, 5000),
     shelve(GPs, Vs, MaxHs, Bays, CPs).
 
 go(SearchOptions, NI, N, FsFull) :- 
     NI > 0, NI1 is NI - 1,
     length(Pre, NI1), append(Pre, Ts, FsFull),
     length(Fs, N), append(Fs,_, Ts), !,
-    %set_prolog_flag(gc, off),
     %statistics, 
-    fd_statistics, reset_timer,
+    %fd_statistics, 
+    reset_timer,
     %findall(Res, bosh(SearchOptions,Fs, Res), ResAll),
     bosh(SearchOptions, Fs, Res), print_time('Time: '),
-    %set_prolog_flag(gc,on), 
-    fd_statistics, Res = res(CPs, DPs), nl, length(CPs, L) , print([L, DPs]),  nl, 
-    fd_statistics.
+    %fd_statistics, 
+    Res = res(_CPs, NBay),
+    nl, format('Number of bays used: ~p', NBay), nl, nl.
     %statistics.
 
 
@@ -295,13 +297,13 @@ test('group - grounded') :-
 
 test(group) :-     
     Ps = [product(1, 7, 100, 620, 700)],
-    group_products(Ps, [MaxH], 55, [V], [task(V,1,_,GL,1)], [product(1, 7, 100, 620, 700)-grouped(BL, BW, BH, RL, RW, RH)]),
+    group_products(Ps, [MaxH], 55, [V], [task(V,1,_,GL,1)], [product(1, 7, 100, 620, 700)-grouped(GL, GW, GH, RL, RW, RH)]),
     MaxH in 155..1000,
     RL in{100}\/{620}\/{700},
     RH in{100}\/{620}\/{700},
     RW in{100}\/{620},
-    BL in 110..4910,
-    BH in 100..4900,
-    BW in 100..3720.  
+    GL in 110..4910,
+    GH in 100..4900,
+    GW in 100..3720.  
 
 :- end_tests(bosh_cumulative).
