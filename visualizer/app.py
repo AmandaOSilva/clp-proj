@@ -73,7 +73,6 @@ sz = shelve[3]
 # sizes = [(20, sy, sz), (20, sy, sz)] + RES[1]  # [0:10]
 # colors = ["b", "b"] + RES[2]  # [0:10]
 
-bays = 4
 positions = RES[0]  # [0:max_res]
 sizes = RES[1]
 colors = RES[2]
