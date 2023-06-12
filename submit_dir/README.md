@@ -32,7 +32,7 @@ For each shelf in turn:
 ```
 | ?- consult('src/bosh_paper').
 ```
-## or, "Cumulative" approach (can't be loaded together) 
+## "Cumulative" approach (can't be loaded together) 
 ```
 | ?- consult('src/bosh_paper_cumulative').
 ```
@@ -53,6 +53,6 @@ For each shelf in turn:
 ```
 | ?- go_export(N).
 
-# if needed: pip install tk matplotlib
+# if needed: "pip install tk matplotlib"
 python src/visualizer.py
  ```
